@@ -16,7 +16,6 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ${{ github.repository }}
 
 jobs:
   # ------------------------------------------------------------------
@@ -145,6 +144,11 @@ jobs:
           SHORT_SHA="${GITHUB_SHA::7}"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "full_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          # OCI registries require a lowercase repository path, but GitHub exposes
+          # the owner with its original casing (Datman701). Lowercase it here
+          # rather than hardcoding, so a rename cannot silently break publishing.
+          NAMESPACE="${GITHUB_REPOSITORY,,}"
+          echo "namespace=${NAMESPACE}" >> "$GITHUB_OUTPUT"
 
       # ---------- Build ----------
       - name: Build backend image
@@ -202,8 +206,8 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backend:${{ steps.meta.outputs.full_sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backend:${{ steps.meta.outputs.short_sha }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.namespace }}/backend:${{ steps.meta.outputs.full_sha }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.namespace }}/backend:${{ steps.meta.outputs.short_sha }}
           labels: |
             org.opencontainers.image.title=clinicdesk-backend
             org.opencontainers.image.revision=${{ steps.meta.outputs.full_sha }}
@@ -215,8 +219,8 @@ jobs:
           context: ./frontend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/frontend:${{ steps.meta.outputs.full_sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/frontend:${{ steps.meta.outputs.short_sha }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.namespace }}/frontend:${{ steps.meta.outputs.full_sha }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.namespace }}/frontend:${{ steps.meta.outputs.short_sha }}
           labels: |
             org.opencontainers.image.title=clinicdesk-frontend
             org.opencontainers.image.revision=${{ steps.meta.outputs.full_sha }}
