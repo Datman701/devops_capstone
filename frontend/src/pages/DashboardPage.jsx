@@ -5,6 +5,38 @@ import KpiCards from '../components/KpiCards';
 import { ErrorState, LoadingState } from '../components/states';
 import { useAppointments } from '../hooks/useClinicData';
 
+/** Ranked list of doctors by appointment volume, with proportional bars. */
+function BusyDoctors({ doctors }) {
+  if (!doctors.length) {
+    return <div className="muted small">No appointments recorded yet.</div>;
+  }
+  const max = Math.max(...doctors.map((doctor) => doctor.count));
+  return (
+    <div className="rank-list">
+      {doctors.map((doctor) => (
+        <div key={doctor.doctor_id}>
+          <div className="rank-row">
+            <div className="rank-row__name">
+              {doctor.full_name}
+              <div className="rank-row__specialty">{doctor.specialty}</div>
+            </div>
+            <div className="rank-row__count">{doctor.count}</div>
+          </div>
+          <div className="rank-row__track">
+            <div
+              style={{
+                width: `${max ? (doctor.count / max) * 100 : 0}%`,
+                height: '100%',
+                background: 'var(--accent)',
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage({ reference }) {
   const [showModal, setShowModal] = useState(false);
 
