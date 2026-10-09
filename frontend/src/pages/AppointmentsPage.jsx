@@ -1,0 +1,90 @@
+import { useState } from 'react';
+import AppointmentTable from '../components/AppointmentTable';
+import BookingModal from '../components/BookingModal';
+import Filters from '../components/Filters';
+import { ErrorState, LoadingState } from '../components/states';
+import { useAppointments, useReferenceData } from '../hooks/useClinicData';
+
+export default function AppointmentsPage() {
+  const reference = useReferenceData();
+  const [filters, setFilters] = useState({
+    status: '',
+    doctor_id: '',
+    date_from: '',
+    date_to: '',
+    upcoming_only: '',
+  });
+  const [showModal, setShowModal] = useState(false);
+  const { doctors, patients } = reference;
+  const { appointments, loading, error, busyId, advance, cancel, reload } = useAppointments(filters, reference.reload);
+
+  return (
+    <div className="content">
+      {error ? <ErrorState error={error} onRetry={reload} /> : null}
+
+      <section className="panel">
+        <div className="panel__head">
+          <h2 className="panel__title">Filters</h2>
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={() => setShowModal(true)}
+          >
+            + Book appointment
+          </button>
+        </div>
+        <div className="panel__body">
+          <Filters
+            filters={filters}
+            doctors={doctors}
+            loading={loading}
+            onChange={setFilters}
+            onReset={() =>
+              setFilters({
+                status: '',
+                doctor_id: '',
+                date_from: '',
+                date_to: '',
+                upcoming_only: '',
+              })
+            }
+          />
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel__head">
+          <h2 className="panel__title">
+            Appointments{' '}
+            <span className="muted small">({appointments.length})</span>
+          </h2>
+          <button type="button" className="btn btn--sm" onClick={reload} disabled={loading}>
+            {loading ? <span className="spinner" /> : 'Refresh'}
+          </button>
+        </div>
+        {loading && !appointments.length ? (
+          <LoadingState />
+        ) : (
+          <AppointmentTable
+            appointments={appointments}
+            onCancel={cancel}
+            onAdvance={advance}
+            busyId={busyId}
+          />
+        )}
+      </section>
+
+      {showModal ? (
+        <BookingModal
+          doctors={doctors}
+          patients={patients}
+          onClose={() => setShowModal(false)}
+          onCreated={() => {
+            setShowModal(false);
+            reload();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
