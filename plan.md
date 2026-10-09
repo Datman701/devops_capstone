@@ -1,10 +1,10 @@
-# 📋 DevOps Capstone Execution Plan
+# DevOps Capstone Execution Plan
 
 ## Module Status
 - M1 (Application): ✅ COMPLETE
 - M2 (Testing): ✅ COMPLETE — 85 tests passing, ruff clean
-- M3 (Git/GitHub): ✅ COMPLETE — 19 commits, public repo, no secrets
-- M4 (Docker): ✅ COMPLETE
+- M3 (Git/GitHub): ✅ COMPLETE — public repo, meaningful commits, no secrets
+- M4 (Docker): ✅ COMPLETE — 3 services healthy, both images non-root
 - M5 (CI/CD): ⬜ NOT STARTED
 - M6 (DevSecOps): ⬜ NOT STARTED
 - M7 (Terraform): ⬜ NOT STARTED
@@ -23,15 +23,15 @@
 - [x] Create `backend/Dockerfile` (multi-stage, non-root, Python 3.12)
 - [x] Create `frontend/Dockerfile` (Node build → Nginx runtime, non-root)
 - [x] Update `docker-compose.yml` to include frontend + backend + postgres
-- [x] Test: `docker compose up --build` - all 3 services running
-- [x] Verify images run as non-root
-  - backend → `uid=1001(app)`, frontend → `uid=101(nginx)`
+- [x] Test: `docker compose up --build` — all 3 services running
+- [x] Verify images run as non-root (backend `uid=1001(app)`, frontend `uid=101(nginx)`)
 
 ### M4 verification notes
-- Frontend published on `:3000`, nginx proxies `/api` → `backend:8000`, SPA routes fall through to `index.html`.
+- Frontend published on `:3000`; nginx proxies `/api` → `backend:8000`; SPA routes fall through to `index.html`.
 - Backend waits on the db healthcheck (`service_healthy`) to avoid racing Postgres init.
-- Both images declare `HEALTHCHECK`; `/health` is liveness-only so a DB outage cannot cause a restart loop, `/ready` is the dependency gate.
-- `.dockerignore` files keep `.venv/`, `node_modules/` and `.env` out of the build context.
+- Both images declare `HEALTHCHECK`. `/health` is liveness-only so a DB outage cannot cause a restart loop; `/ready` is the dependency gate.
+- `.dockerignore` keeps `.venv/`, `node_modules/` and `.env` out of the build context.
+- `docker compose up --build` was verified against the built stack; filter contract re-verified through nginx on `:3000`.
 
 ## M5: CI/CD (15 points)
 - [ ] Create `.github/workflows/ci.yml`
@@ -52,6 +52,7 @@
 - [ ] EKS cluster with node group
 - [ ] `terraform.tfvars.example` (no credentials)
 - [ ] Test: init, plan, apply, destroy all work
+- [ ] **BLOCKED: needs AWS credentials + region from the user before apply**
 
 ## M8: Kubernetes + Helm (15 points)
 - [ ] `k8s/namespace.yaml`
@@ -62,7 +63,7 @@
 - [ ] Test: helm upgrade --install, pods running
 
 ## M9: Observability (10 points)
-- [ ] Backend `/metrics` endpoint
+- [x] Backend `/metrics` endpoint (Prometheus instrumentation already present, verified 200)
 - [ ] `monitoring/` with Prometheus + Grafana values
 - [ ] Verify Prometheus scraping
 - [ ] Grafana dashboard showing metrics
