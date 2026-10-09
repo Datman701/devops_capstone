@@ -22,5 +22,46 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: clinicdesk-backend:local
+    container_name: clinicdesk-backend
+    restart: unless-stopped
+    environment:
+      # Runs against the Compose network, so the host is `db`, not localhost.
+      DATABASE_URL: postgresql+psycopg://clinic:clinic@db:5432/clinic
+      APP_ENV: production
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        # Wait for a real accepting-connections signal, not just "container
+        # started", otherwise the API races Postgres initialisation and crashes.
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: clinicdesk-frontend:local
+    container_name: clinicdesk-frontend
+    restart: unless-stopped
+    # Published on 3000 so the whole stack is reachable on one port; nginx also
+    # proxies /api to the backend, so the browser needs no second origin.
+    ports:
+      - "3000:8080"
+    depends_on:
+      backend:
+        condition: service_started
+
 volumes:
   clinicdesk-pgdata:

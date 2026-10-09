@@ -2,9 +2,9 @@
 
 ## Module Status
 - M1 (Application): ✅ COMPLETE
-- M2 (Testing): ✅ COMPLETE
-- M3 (Git/GitHub): ⬜ NOT STARTED
-- M4 (Docker): ⬜ NOT STARTED
+- M2 (Testing): ✅ COMPLETE — 85 tests passing, ruff clean
+- M3 (Git/GitHub): ✅ COMPLETE — 19 commits, public repo, no secrets
+- M4 (Docker): ✅ COMPLETE
 - M5 (CI/CD): ⬜ NOT STARTED
 - M6 (DevSecOps): ⬜ NOT STARTED
 - M7 (Terraform): ⬜ NOT STARTED
@@ -12,12 +12,26 @@
 - M9 (Observability): ⬜ NOT STARTED
 - M10 (Presentation): ⬜ NOT STARTED
 
+## Application polish (completed)
+- [x] Appointments filter requires an explicit **Apply filter** action (draft vs applied state)
+- [x] Fixed unbounded refetch loop in `useAppointments` (dep keyed on filters object identity)
+- [x] Removed duplicated `useReferenceData`/`useAppointments` copies inlined in `DashboardPage`
+- [x] Removed spurious unconditional error banner on the dashboard
+- [x] Added `scripts/verify-filter.mjs` browser check for the filter contract
+
 ## M4: Docker (10 points)
-- [ ] Create `backend/Dockerfile` (multi-stage, non-root, Python 3.12)
-- [ ] Create `frontend/Dockerfile` (Node build → Nginx runtime, non-root)
-- [ ] Update `docker-compose.yml` to include frontend + backend + postgres
-- [ ] Test: `docker compose up --build` - all 3 services running
-- [ ] Verify images run as non-root
+- [x] Create `backend/Dockerfile` (multi-stage, non-root, Python 3.12)
+- [x] Create `frontend/Dockerfile` (Node build → Nginx runtime, non-root)
+- [x] Update `docker-compose.yml` to include frontend + backend + postgres
+- [x] Test: `docker compose up --build` - all 3 services running
+- [x] Verify images run as non-root
+  - backend → `uid=1001(app)`, frontend → `uid=101(nginx)`
+
+### M4 verification notes
+- Frontend published on `:3000`, nginx proxies `/api` → `backend:8000`, SPA routes fall through to `index.html`.
+- Backend waits on the db healthcheck (`service_healthy`) to avoid racing Postgres init.
+- Both images declare `HEALTHCHECK`; `/health` is liveness-only so a DB outage cannot cause a restart loop, `/ready` is the dependency gate.
+- `.dockerignore` files keep `.venv/`, `node_modules/` and `.env` out of the build context.
 
 ## M5: CI/CD (15 points)
 - [ ] Create `.github/workflows/ci.yml`

@@ -1,0 +1,14 @@
+# Keep the build context small and keep host artefacts out of the image.
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-error.log*
+
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+
+# Tests and docs are not part of the shipped bundle.
+scripts/

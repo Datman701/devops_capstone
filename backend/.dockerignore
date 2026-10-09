@@ -1,0 +1,25 @@
+# Keep the build context small and prevent local state leaking into the image.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local secrets must never be baked into an image. Configuration is supplied at
+# run time through environment variables in docker-compose.yml.
+.env
+.env.*
+!.env.example
+
+# Tests are not needed at runtime.
+tests/
+pytest.ini
+
+.git/
+.gitignore
+Dockerfile
+.dockerignore
