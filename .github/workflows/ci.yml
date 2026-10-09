@@ -45,7 +45,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The suite derives clinic_test from DATABASE_URL and needs the database
       # to actually exist, so create it before running pytest.
@@ -57,7 +57,7 @@ jobs:
           PGPASSWORD: clinic
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: pip
@@ -89,10 +89,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -107,7 +107,7 @@ jobs:
         run: npm run build
 
       - name: Upload the built bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist
@@ -123,15 +123,15 @@ jobs:
     needs: [backend-test, frontend-build]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Logging into GHCR with the automatic GITHUB_TOKEN. No long-lived
       # registry secret is stored in the repository.
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -148,7 +148,7 @@ jobs:
 
       # ---------- Build ----------
       - name: Build backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: false
@@ -160,7 +160,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build frontend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           push: false
@@ -177,7 +177,7 @@ jobs:
       # reach the registry. Unfixed CVEs are ignored because there is no patch
       # to apply yet; they are still reported in the table and summary.
       - name: Trivy scan — backend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: clinicdesk-backend:${{ steps.meta.outputs.short_sha }}
           format: table
@@ -186,7 +186,7 @@ jobs:
           exit-code: '1'
 
       - name: Trivy scan — frontend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: clinicdesk-frontend:${{ steps.meta.outputs.short_sha }}
           format: table
@@ -197,7 +197,7 @@ jobs:
       # ---------- Publish ----------
       # Pushing happens only after tests, builds and scans all pass.
       - name: Push backend image to GHCR
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: true
@@ -210,7 +210,7 @@ jobs:
           cache-from: type=gha
 
       - name: Push frontend image to GHCR
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./frontend
           push: true
