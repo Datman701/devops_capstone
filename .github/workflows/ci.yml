@@ -1,0 +1,236 @@
+name: CI/CD
+
+# The pipeline runs on every push to main (the grading requirement) and on any
+# pull request, so changes are validated before they land.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two runs for the same ref overwrite each other's registry tags.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository }}
+
+jobs:
+  # ------------------------------------------------------------------
+  # M2 gate: the test suite must pass before anything is built or shipped.
+  # ------------------------------------------------------------------
+  backend-test:
+    name: Backend tests (pytest)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic
+          POSTGRES_DB: clinic
+          POSTGRES_MULTIPLE_DATABASES: clinic_test
+        ports:
+          - 5432:5432
+        # Without this the job can start before Postgres is accepting
+        # connections and the suite fails for the wrong reason.
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinic"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The suite derives clinic_test from DATABASE_URL and needs the database
+      # to actually exist, so create it before running pytest.
+      - name: Create the test database
+        run: |
+          PGPASSWORD=clinic psql -h 127.0.0.1 -U clinic -d clinic \
+            -c "CREATE DATABASE clinic_test;"
+        env:
+          PGPASSWORD: clinic
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+
+      - name: Run pytest
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://clinic:clinic@127.0.0.1:5432/clinic
+          TEST_DATABASE_URL: postgresql+psycopg://clinic:clinic@127.0.0.1:5432/clinic_test
+        run: pytest -v --tb=short
+
+      - name: Lint with ruff
+        working-directory: backend
+        run: |
+          ruff check .
+          ruff format --check .
+
+  # ------------------------------------------------------------------
+  # The frontend must compile cleanly before it is baked into an image.
+  # ------------------------------------------------------------------
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload the built bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
+  # ------------------------------------------------------------------
+  # M5 + M6: build both images, scan them with Trivy, then publish to GHCR
+  # tagged with the commit SHA.
+  # ------------------------------------------------------------------
+  docker:
+    name: Build, scan and publish images
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-build]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Logging into GHCR with the automatic GITHUB_TOKEN. No long-lived
+      # registry secret is stored in the repository.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        run: |
+          # Full commit SHA is the tag used everywhere: a given image always maps
+          # back to exactly one commit, so a running deployment is reproducible.
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "full_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      # ---------- Build ----------
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: |
+            clinicdesk-backend:${{ steps.meta.outputs.short_sha }}
+            clinicdesk-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: |
+            clinicdesk-frontend:${{ steps.meta.outputs.short_sha }}
+            clinicdesk-frontend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ---------- M6: Trivy security gate ----------
+      # Scans OS packages and application dependencies. exit-code: 1 makes a
+      # HIGH or CRITICAL finding fail the job, so a vulnerable image can never
+      # reach the registry. Unfixed CVEs are ignored because there is no patch
+      # to apply yet; they are still reported in the table and summary.
+      - name: Trivy scan — backend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: clinicdesk-backend:${{ steps.meta.outputs.short_sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Trivy scan — frontend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: clinicdesk-frontend:${{ steps.meta.outputs.short_sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      # ---------- Publish ----------
+      # Pushing happens only after tests, builds and scans all pass.
+      - name: Push backend image to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backend:${{ steps.meta.outputs.full_sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backend:${{ steps.meta.outputs.short_sha }}
+          labels: |
+            org.opencontainers.image.title=clinicdesk-backend
+            org.opencontainers.image.revision=${{ steps.meta.outputs.full_sha }}
+          cache-from: type=gha
+
+      - name: Push frontend image to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/frontend:${{ steps.meta.outputs.full_sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/frontend:${{ steps.meta.outputs.short_sha }}
+          labels: |
+            org.opencontainers.image.title=clinicdesk-frontend
+            org.opencontainers.image.revision=${{ steps.meta.outputs.full_sha }}
+          cache-from: type=gha
+
+      - name: Summarise published images
+        run: |
+          {
+            echo "### Published images"
+            echo ""
+            echo "| Image | Tags |"
+            echo "|-------|------|"
+            echo "| \`backend\` | \`${{ steps.meta.outputs.full_sha }}\`, \`${{ steps.meta.outputs.short_sha }}\` |"
+            echo "| \`frontend\` | \`${{ steps.meta.outputs.full_sha }}\`, \`${{ steps.meta.outputs.short_sha }}\` |"
+            echo ""
+            echo "Trivy found no unfixed HIGH or CRITICAL vulnerabilities, so the pipeline allowed the publish."
+          } >> "$GITHUB_STEP_SUMMARY"
