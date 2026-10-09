@@ -9,6 +9,14 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Default the token to read-only and grant package publishing only where it is
+# needed. Without an explicit block the GITHUB_TOKEN inherits whatever the
+# repository default is, and pushes to GHCR fail with
+# "installation not allowed to Create organization package".
+permissions:
+  contents: read
+  packages: write
+
 # Never let two runs for the same ref overwrite each other's registry tags.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
