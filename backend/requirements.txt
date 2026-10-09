@@ -1,11 +1,23 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-sqlalchemy==2.0.36
+# Pinned for reproducible builds.
+#
+# Security note: these versions were raised to clear the HIGH-severity CVEs that
+# the Trivy gate in .github/workflows/ci.yml found in the image. See
+# docs/security.md for the scan output and what each finding meant.
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.4
 psycopg[binary]==3.2.3
-alembic==1.14.0
-pydantic==2.10.4
-pydantic-settings==2.7.0
+alembic==1.20.0
+pydantic==2.14.0
+pydantic-settings==2.15.0
 email-validator==2.2.0
 prometheus-client==0.21.1
-prometheus-fastapi-instrumentator==7.0.0
+# Must stay >= 8.0.0: 7.x calls route.path on FastAPI's router objects and
+# raises AttributeError on FastAPI 0.14x.
+prometheus-fastapi-instrumentator==8.1.0
 python-dotenv==1.0.1
+
+# Trivy flagged urllib3 2.7.0 for a TLS interception issue (CVE-2026-97687) and
+# an unbounded-memory DoS (CVE-2026-97689). It is a transitive dependency, so
+# it is pinned explicitly to keep the scan gate green on rebuilds.
+urllib3==2.8.0

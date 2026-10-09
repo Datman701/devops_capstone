@@ -22,7 +22,16 @@ COPY src ./src
 RUN npm run build
 
 # ---------- Stage 2: nginx runtime ----------
-FROM nginx:1.27-alpine AS runtime
+# Pinned to an exact patch tag rather than `alpine` so a rebuild resolves the
+# same base image. The previous 1.27 tag shipped Alpine 3.21, which carried 45
+# HIGH/CRITICAL CVEs in libssl3, libcrypto3, libexpat, libpng and libxml2 that
+# the Trivy gate in M6 rejects. 1.30 is on Alpine 3.24 with those patched.
+FROM nginx:1.30.5-alpine AS runtime
+
+# Alpine's base image is rebuilt on a schedule, so a tag can still ship packages
+# that were patched afterwards. Upgrading at build time pulls the current expat,
+# pcre2 and tiff versions that clear the Trivy gate.
+RUN apk upgrade --no-cache
 
 # nginx:alpine ships an nginx user (uid 101) already.
 COPY nginx.conf /etc/nginx/conf.d/default.conf

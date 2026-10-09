@@ -27,8 +27,14 @@ WORKDIR /build
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# `python -m venv` seeds pip and setuptools from whatever the base image ships
+# (70.3.0 at the time of writing), which Trivy reports as CVE-2025-47273, a path
+# traversal in setuptools. Upgrade the build tooling before installing anything
+# so the copy in the runtime stage is already patched.
+RUN pip install --upgrade pip setuptools wheel
+
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 # ---------- Stage 2: runtime ----------
 FROM python:3.12-slim-bookworm AS runtime
@@ -44,6 +50,24 @@ ENV PYTHONUNBUFFERED=1 \
     APP_ENV=production
 
 COPY --from=builder /opt/venv /opt/venv
+
+# Strip pip, setuptools and pkg_resources from the runtime image.
+#
+# A running application never imports pip, but pip ships vendored copies of
+# msgpack 1.1.2, urllib3 2.7.0 and setuptools 70.3.0 that Trivy reports as
+# HIGH (GHSA-6v7p-g79w-8964, CVE-2026-97687, CVE-2025-47273). Those findings are
+# not exploitable here, but removing the packages removes the findings honestly
+# and shrinks the image. Nothing is compiled at run time, so pip is not needed.
+RUN /opt/venv/bin/python -m pip uninstall -y pip setuptools wheel \
+    && rm -rf \
+        /opt/venv/lib/python3.12/site-packages/pip \
+        /opt/venv/lib/python3.12/site-packages/pip-*.dist-info \
+        /opt/venv/lib/python3.12/site-packages/setuptools \
+        /opt/venv/lib/python3.12/site-packages/setuptools-*.dist-info \
+        /opt/venv/lib/python3.12/site-packages/pkg_resources \
+        /opt/venv/lib/python3.12/site-packages/_distutils_hack \
+        /opt/venv/bin/pip /opt/venv/bin/pip3 /opt/venv/bin/pip3.12 \
+        /opt/venv/bin/wheel
 
 # Run as an unprivileged user. A fixed uid/gid keeps bind-mounted volumes
 # predictable when the container is run with --user.
