@@ -3,20 +3,20 @@ import AppointmentTable from '../components/AppointmentTable';
 import BookingModal from '../components/BookingModal';
 import Filters from '../components/Filters';
 import { ErrorState, LoadingState } from '../components/states';
-import { useAppointments, useReferenceData } from '../hooks/useClinicData';
+import { EMPTY_FILTERS, useAppointments } from '../hooks/useClinicData';
 
-export default function AppointmentsPage() {
-  const reference = useReferenceData();
-  const [filters, setFilters] = useState({
-    status: '',
-    doctor_id: '',
-    date_from: '',
-    date_to: '',
-    upcoming_only: '',
-  });
+export default function AppointmentsPage({ reference }) {
+  // `draftFilters` holds what the user is editing; `appliedFilters` is what the
+  // list is actually fetched with. Keeping them separate means every keystroke
+  // or dropdown change does not fire a request — only Apply does.
+  const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
   const [showModal, setShowModal] = useState(false);
   const { doctors, patients } = reference;
-  const { appointments, loading, error, busyId, advance, cancel, reload } = useAppointments(filters, reference.reload);
+  const { appointments, loading, error, busyId, advance, cancel, reload } = useAppointments(
+    appliedFilters,
+    reference.reload,
+  );
 
   return (
     <div className="content">
@@ -35,19 +35,16 @@ export default function AppointmentsPage() {
         </div>
         <div className="panel__body">
           <Filters
-            filters={filters}
+            filters={draftFilters}
+            appliedFilters={appliedFilters}
             doctors={doctors}
             loading={loading}
-            onChange={setFilters}
-            onReset={() =>
-              setFilters({
-                status: '',
-                doctor_id: '',
-                date_from: '',
-                date_to: '',
-                upcoming_only: '',
-              })
-            }
+            onChange={setDraftFilters}
+            onApply={() => setAppliedFilters(draftFilters)}
+            onReset={() => {
+              setDraftFilters(EMPTY_FILTERS);
+              setAppliedFilters(EMPTY_FILTERS);
+            }}
           />
         </div>
       </section>

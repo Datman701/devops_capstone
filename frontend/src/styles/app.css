@@ -379,6 +379,12 @@ button {
   align-items: flex-end;
 }
 
+.filters__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .field {
   display: flex;
   flex-direction: column;

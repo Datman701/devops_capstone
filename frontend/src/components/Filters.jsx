@@ -2,13 +2,20 @@ import { STATUSES } from '../utils/format';
 
 export default function Filters({
   filters,
+  appliedFilters,
   doctors,
   onChange,
+  onApply,
   onReset,
   loading,
 }) {
   const update = (key) => (event) =>
     onChange({ ...filters, [key]: event.target.value });
+
+  const dirty = Boolean(
+    appliedFilters &&
+      Object.keys(filters).some((key) => filters[key] !== appliedFilters[key]),
+  );
 
   return (
     <div className="filters">
@@ -90,9 +97,19 @@ export default function Filters({
         </select>
       </div>
 
-      <button type="button" className="btn btn--sm" onClick={onReset} disabled={loading}>
-        Reset
-      </button>
+      <div className="filters__actions">
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          onClick={onApply}
+          disabled={loading || !dirty}
+        >
+          Apply filter
+        </button>
+        <button type="button" className="btn btn--sm" onClick={onReset} disabled={loading}>
+          Reset
+        </button>
+      </div>
     </div>
   );
 }

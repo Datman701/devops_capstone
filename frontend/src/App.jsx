@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 
 import Sidebar from './components/Sidebar';
@@ -7,7 +7,7 @@ import AppointmentsPage from './pages/AppointmentsPage';
 import DashboardPage from './pages/DashboardPage';
 import DoctorsPage from './pages/DoctorsPage';
 import PatientsPage from './pages/PatientsPage';
-import { useAppointments, useReferenceData } from './hooks/useClinicData';
+import { useReferenceData } from './hooks/useClinicData';
 
 const TITLES = {
   '/': { title: 'Dashboard', subtitle: 'Clinic-wide appointment overview' },
@@ -19,21 +19,11 @@ const TITLES = {
   '/patients': { title: 'Patients', subtitle: 'Registered patient directory' },
 };
 
-const UPCOMING_FILTERS = { upcoming_only: 'true', limit: 8 };
-
 export default function App() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Single source of truth for doctors/patients/stats, shared by every page.
   const reference = useReferenceData();
-
-  const upcoming = useAppointments(
-    useMemo(() => UPCOMING_FILTERS, []),
-    reference.reload,
-  );
-  const all = useAppointments(
-    useMemo(() => ({ status: '', doctor_id: '', date_from: '', date_to: '', upcoming_only: '' }), []),
-    reference.reload,
-  );
 
   const meta = TITLES[location.pathname] ?? TITLES['/'];
 
@@ -62,11 +52,11 @@ export default function App() {
         <Routes>
           <Route
             path="/"
-            element={<DashboardPage reference={reference} upcoming={upcoming} />}
+            element={<DashboardPage reference={reference} />}
           />
           <Route
             path="/appointments"
-            element={<AppointmentsPage reference={reference} list={all} />}
+            element={<AppointmentsPage reference={reference} />}
           />
           <Route
             path="/doctors"

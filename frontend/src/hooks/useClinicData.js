@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
 
@@ -78,21 +76,28 @@ export function useAppointments(filters = {}, onChanged) {
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
+  // Depend on a serialised form of the filters rather than the object itself.
+  // Callers pass inline literals like `{ upcoming_only: 'true' }`, which are a
+  // new reference on every render — keying the effect on identity would refetch
+  // in a loop and hammer the API.
+  const filterKey = JSON.stringify(filters);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      const active = JSON.parse(filterKey);
       const params = {
-        status: filters.status || undefined,
-        doctor_id: filters.doctor_id || undefined,
-        date_from: filters.date_from
-          ? new Date(`${filters.date_from}T00:00:00`).toISOString()
+        status: active.status || undefined,
+        doctor_id: active.doctor_id || undefined,
+        date_from: active.date_from
+          ? new Date(`${active.date_from}T00:00:00`).toISOString()
           : undefined,
-        date_to: filters.date_to
-          ? new Date(`${filters.date_to}T23:59:59`).toISOString()
+        date_to: active.date_to
+          ? new Date(`${active.date_to}T23:59:59`).toISOString()
           : undefined,
-        upcoming_only: filters.upcoming_only || undefined,
-        limit: 100,
+        upcoming_only: active.upcoming_only || undefined,
+        limit: active.limit ?? 100,
       };
       setAppointments(await api.listAppointments(params));
     } catch (err) {
@@ -101,7 +106,7 @@ export function useAppointments(filters = {}, onChanged) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filterKey]);
 
   useEffect(() => {
     load();
