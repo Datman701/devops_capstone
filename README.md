@@ -4,9 +4,11 @@ A clinic appointment booking application: a React dashboard over a FastAPI
 backend and PostgreSQL. Doctors, patients and appointments with slot-conflict
 protection and a status workflow.
 
-This repository currently covers the **application layer** (backend, database,
-frontend, tests). The DevOps layers — Docker, CI/CD, Terraform, Kubernetes, Helm
-and monitoring — are added on top of this structure.
+This repository covers the application *and* its full DevOps lifecycle —
+containers, a gated CI/CD pipeline with container scanning, AWS infrastructure
+code, a Helm chart for Kubernetes, and Prometheus/Grafana monitoring.
+
+**Evidence for every module is collected in [`docs/screenshots.md`](docs/screenshots.md).**
 
 ## Tech stack
 
@@ -16,7 +18,12 @@ and monitoring — are added on top of this structure.
 | Backend | FastAPI, Pydantic v2, SQLAlchemy 2.0 |
 | Database | PostgreSQL 16, Alembic migrations |
 | Tests | pytest + httpx (`TestClient`) |
-| Tooling | uv (Python 3.12), ruff, Node 20+ |
+| Containers | Multi-stage Dockerfiles, Docker Compose |
+| CI/CD | GitHub Actions, GHCR, Trivy |
+| IaC | Terraform (VPC + EKS) |
+| Orchestration | Helm, Kubernetes, ingress-nginx |
+| Monitoring | Prometheus, Grafana |
+| Tooling | uv (Python 3.12), ruff, Node 22+ |
 
 ## What it does
 
@@ -53,21 +60,63 @@ clinic-desk/
 │   │   └── api/routes/          system, directory, appointments, stats
 │   ├── alembic/versions/        0001_initial_schema.py
 │   ├── tests/                   conftest.py + 7 test modules
+│   ├── Dockerfile               multi-stage, runs as uid 1001
 │   └── pytest.ini
 ├── frontend/
-│   └── src/
-│       ├── api/client.js        Single fetch wrapper
-│       ├── components/          Sidebar, Topbar, KpiCards, table, modal
-│       ├── hooks/useClinicData.js
-│       ├── pages/               Dashboard, Appointments, Doctors, Patients
-│       └── styles/app.css
-├── scripts/                     dev helpers + smoke tests
-└── docker-compose.yml           PostgreSQL for local development
+│   ├── src/
+│   │   ├── api/client.js        Single fetch wrapper
+│   │   ├── components/          Sidebar, Topbar, KpiCards, table, modal
+│   │   ├── hooks/useClinicData.js
+│   │   ├── pages/               Dashboard, Appointments, Doctors, Patients
+│   │   └── styles/app.css
+│   ├── Dockerfile               Node build → nginx runtime, runs as uid 101
+│   └── nginx.conf
+├── docker-compose.yml           Full stack: frontend, backend, PostgreSQL
+├── .github/workflows/ci.yml     Tests → builds → scans → publishes to GHCR
+├── helm/clinicdesk/             Chart for the Kubernetes deployment
+├── k8s/namespace.yaml
+├── monitoring/
+│   ├── prometheus/values.yaml   Scrape config + alert rules
+│   └── grafana/                 Datasource + provisioned dashboard
+├── terraform/                   VPC with public subnets + EKS cluster
+├── docs/
+│   ├── screenshots.md           Every submission screenshot, annotated
+│   ├── screenshots/             The images themselves
+│   └── security.md              Trivy findings and remediations
+├── scripts/                     Dev helpers, smoke tests, screenshot tooling
+└── plan.md                      Module checklist with completion evidence
 ```
 
-## Running locally
+## Running it
 
-### 1. Start PostgreSQL
+### The whole stack with one command
+
+```bash
+docker compose up --build
+```
+
+- Application: <http://localhost:3000>
+- API docs: <http://localhost:8000/docs>
+
+nginx serves the built React bundle and reverse-proxies `/api` to the backend,
+so the browser makes same-origin requests and no CORS configuration is needed.
+
+Both images run as non-root users, and each declares a `HEALTHCHECK`. The
+backend waits on the PostgreSQL healthcheck before starting, so it cannot race
+database initialisation.
+
+To tear down, keeping the data volume:
+
+```bash
+docker compose down
+```
+
+### Frontend and backend on the host, for development
+
+<details>
+<summary>Click to expand</summary>
+
+**1. PostgreSQL**
 
 ```bash
 docker compose up -d db
@@ -75,7 +124,7 @@ docker compose up -d db
 
 This also creates a separate `clinic_test` database for pytest.
 
-### 2. Backend
+**2. Backend**
 
 ```bash
 cd backend
@@ -89,12 +138,7 @@ cp .env.example .env
 .venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
-- API docs: <http://localhost:8000/docs>
-- Liveness: <http://localhost:8000/health>
-- Readiness: <http://localhost:8000/ready>
-- Metrics: <http://localhost:8000/metrics>
-
-### 3. Frontend
+**3. Frontend**
 
 ```bash
 cd frontend
@@ -102,7 +146,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173>.
+Open <http://localhost:5173>. Vite proxies `/api` to port 8000.
 
 Or use the helper scripts from the repository root:
 
@@ -111,10 +155,127 @@ Or use the helper scripts from the repository root:
 ./scripts/dev-frontend.sh     # detached vite on :5173
 ```
 
-## API
+</details>
+
+## CI/CD
+
+Every push to `main`, and every pull request, runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+| Job | Does | Gate |
+|---|---|---|
+| `backend-test` | 85 pytest tests against a throwaway Postgres service, then `ruff check` and `ruff format --check` | Fails the run |
+| `frontend-build` | `npm ci` and the Vite production build; uploads the bundle as an artifact | Fails the run |
+| `docker` | Builds both images, **scans them with Trivy**, then pushes to GHCR | `needs:` both jobs above |
+
+Nothing is built or published unless tests pass and the frontend compiles.
+
+Images are tagged with the **full and short commit SHA** — never `latest` — so
+a deployed image always maps back to exactly one commit:
+
+```text
+ghcr.io/datman701/devops_capstone/backend:<sha>
+ghcr.io/datman701/devops_capstone/frontend:<sha>
+```
+
+Publishing uses the automatic `GITHUB_TOKEN`, so no registry secret is stored in
+the repository. The workflow declares `packages: write` explicitly; without it
+the token inherits the repository default and cannot create packages.
+
+### Security gate
+
+Trivy scans both images for OS-package and Python-dependency CVEs and is
+configured with `exit-code: '1'`, so **a HIGH or CRITICAL finding fails the job
+and the push steps never run**. Unfixed CVEs are reported but not blocking,
+since there is nothing to apply.
+
+Both images currently report **0 HIGH and 0 CRITICAL**. See
+[`docs/security.md`](docs/security.md) for the findings that were remediated and
+what each one meant.
+
+## Infrastructure as code
+
+[`terraform/`](terraform/) provisions a VPC across two availability zones with
+public and private subnets, an internet gateway, workload security groups, and
+an EKS cluster with a managed worker node group — 27 resources.
+
+```bash
+cd terraform
+terraform init
+terraform validate
+terraform plan -var-file=terraform.tfvars.example
+terraform apply  -var-file=terraform.tfvars.example
+```
+
+**Credentials are never in the configuration.** Terraform reads them from the
+standard AWS chain (`AWS_PROFILE`, environment variables, `~/.aws/credentials`),
+and `terraform.tfvars` is gitignored — only `terraform.tfvars.example` is
+committed.
+
+A NAT Gateway defaults to **off**, because at roughly USD 0.045/hour plus data
+charges it is the most expensive line item in the stack. With it off, worker
+nodes run in public subnets, which is fine for a throwaway cluster. Set
+`enable_nat_gateway = true` for anything resembling a real deployment.
+
+> **Clean up after yourself:** `terraform destroy` when the demonstration is
+> done, so the cluster stops billing.
+
+## Kubernetes
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+
+kind load docker-image clinicdesk-backend:local clinicdesk-frontend:local
+
+helm upgrade --install clinicdesk ./helm/clinicdesk \
+  --namespace clinicdesk --wait
+```
+
+This deploys two backend replicas, two frontend replicas and PostgreSQL, all
+behind ClusterIP Services, with an Ingress routing `/api` to the backend and
+everything else to the SPA. Migrations run as an **initContainer**, so the pods
+are never serving against an empty schema.
+
+```bash
+kubectl get pods -n clinicdesk
+kubectl get svc  -n clinicdesk
+
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80
+# open http://localhost:8080
+```
+
+Watch the deployment handle a rolling update:
+
+```bash
+kubectl set image deploy/clinicdesk-backend \
+  backend=clinicdesk-backend:local -n clinicdesk
+kubectl rollout status deploy/clinicdesk-backend -n clinicdesk
+```
+
+## Monitoring
+
+```bash
+./scripts/install-monitoring.sh
+```
+
+Installs Prometheus and Grafana from [`monitoring/`](monitor/), each with its
+own values file. Prometheus discovers the API through the `prometheus.io/*`
+annotations the Helm chart places on the metrics Service.
+
+```bash
+kubectl port-forward -n monitoring svc/prometheus-server 9090:80   # targets
+kubectl port-forward -n monitoring svc/grafana 3000:80             # admin / clinicdesk
+```
+
+The Grafana dashboard is provisioned automatically — request rate, p95 latency,
+5xx ratio and per-endpoint breakdown, with an `Endpoint` variable to filter the
+panels.
+
+`/metrics` is deliberately **not** under `/api`, because only `/api/*` is routed
+through the Ingress. Metrics get their own ClusterIP Service and stay off the
+public ingress.
 
 Probe endpoints stay at the root; everything the browser uses lives under
-`/api`. This split is what lets Nginx and the Kubernetes Ingress route `/api/*`
+`/api`. This split is what lets nginx and the Kubernetes Ingress route `/api/*`
 to the backend and everything else to the static frontend.
 
 | Method | Path | Purpose |
@@ -224,12 +385,18 @@ node scripts/shot.mjs http://127.0.0.1:5173 /tmp/dashboard.png
 
 ## Status
 
-| Area | State |
-|---|---|
-| Backend + REST API | Done |
-| Database + Alembic | Done |
-| Tests | Done (85 passing) |
-| Frontend dashboard | Done |
-| Docker / Compose (full stack) | Next |
-| CI/CD + security scan | Next |
-| Terraform / Kubernetes / Helm / monitoring | Next |
+| Area | State | Evidence |
+|---|---|---|
+| Backend + REST API | ✅ Done | [`docs/screenshots.md` §1](docs/screenshots.md#m1--application-10-points) |
+| Database + Alembic | ✅ Done | M1 |
+| Tests | ✅ Done — 85 passing | [§2](docs/screenshots.md#m2--testing-10-points) |
+| Frontend dashboard | ✅ Done — responsive | §1 |
+| Docker / Compose | ✅ Done — 3 healthy services, non-root | [§4](docs/screenshots.md#m4--docker-10-points) |
+| CI/CD + GHCR | ✅ Done — green pipeline, SHA tags | [§5](docs/screenshots.md#m5--cicd-15-points) |
+| Security scanning | ✅ Done — 0 HIGH / 0 CRITICAL | [§6](docs/screenshots.md#m6--devsecops-5-points) |
+| Terraform (VPC + EKS) | 🟡 Code complete and validated — needs a real `apply` | [§7](docs/screenshots.md#m7--terraform-15-points) |
+| Kubernetes + Helm | ✅ Done — 5 pods Running via Ingress | [§8](docs/screenshots.md#m8--kubernetes--helm-15-points) |
+| Observability | ✅ Done — target UP, 9 live Grafana panels | [§9](docs/screenshots.md#m9--observability-10-points) |
+
+The only outstanding item is running `terraform apply` against a real AWS
+account to produce the console and teardown screenshots.
