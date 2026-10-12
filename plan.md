@@ -9,7 +9,7 @@
 - M6 (DevSecOps): ✅ COMPLETE — Trivy gate on both images, 0 HIGH/CRITICAL
 - M7 (Terraform): ⬜ NOT STARTED
 - M8 (Kubernetes + Helm): ✅ COMPLETE — 5 pods Running via Helm on kind
-- M9 (Observability): 🔄 IN PROGRESS
+- M9 (Observability): ✅ COMPLETE — Prometheus scraping, Grafana dashboard live
 - M10 (Presentation): ⬜ NOT STARTED
 
 ## Application polish (completed)
@@ -121,11 +121,35 @@ Design decisions worth knowing:
 - **Pod anti-affinity is `preferred`, not required**, so replicas spread across nodes but
   still schedule on a single-node cluster instead of leaving one Pending.
 
+
 ## M9: Observability (10 points)
 - [x] Backend `/metrics` endpoint (Prometheus instrumentation already present, verified 200)
-- [ ] `monitoring/` with Prometheus + Grafana values
-- [ ] Verify Prometheus scraping
-- [ ] Grafana dashboard showing metrics
+- [x] `monitoring/` with Prometheus + Grafana values files
+- [x] Verify Prometheus scraping — `clinicdesk-api` target reports UP
+- [x] Grafana dashboard showing live metrics — 9 panels, all populated
+
+### M9 verification
+Installed with `./scripts/install-monitoring.sh`, which fetches the upstream chart tarballs
+to a local cache first (`helm install` pulling straight from GitHub proved unreliable on this
+link), then applies `monitoring/prometheus/values.yaml` and `monitoring/grafana/values.yaml`.
+
+Prometheus discovers the API through the `prometheus.io/scrape` annotations the app chart
+already puts on `clinicdesk-backend-metrics`. `/metrics` is deliberately *not* under `/api`,
+because only `/api/*` is routed through the Ingress — so metrics get their own ClusterIP
+Service that stays off the public Ingress.
+
+Grafana gets a provisioned Prometheus datasource and a pre-built dashboard
+(`monitoring/grafana/dashboards/clinicdesk-api.json`, injected via `--set-file` so the JSON
+stays the single source of truth rather than being duplicated as inline YAML). Panels cover
+target health, request rate, p95 latency, 5xx ratio and per-endpoint latency, with an
+`Endpoint` template variable to filter them.
+
+Two things the work surfaced:
+- The 5xx ratio panel initially read **No data**, because when there are no 5xx series the
+  numerator returns an empty vector rather than 0. Fixed with `or vector(0)`.
+- `scripts/screenshot-grafana.mjs` asserts panels actually rendered before writing the
+  image, so a broken datasource can never produce a pretty but empty screenshot. It caught a
+  stale port-forward after a pod replacement, which is exactly what it is for.
 
 ## M10: Presentation (5 points)
 - [ ] Update README with DevOps instructions

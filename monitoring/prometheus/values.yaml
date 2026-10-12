@@ -1,0 +1,90 @@
+# Prometheus values for the ClinicDesk monitoring stack (M9).
+#
+# Deployed with:
+#   helm upgrade --install prometheus ./monitoring/prometheus \
+#     --namespace monitoring --create-namespace -f monitoring/prometheus/values.yaml
+#
+# Scope: this is a demonstration scrape of the ClinicDesk API, not a full
+# Kubernetes operator stack. It deliberately avoids kube-prometheus-stack,
+# whose operator and node-exporter add far more memory than a local cluster has
+# to spare, and whose ServiceMonitor CRDs are not needed because the chart
+# already carries the scrape annotations we attach in the app Helm chart.
+
+alertmanager:
+  enabled: false
+
+server:
+  persistentVolume:
+    enabled: false
+  # Local cluster only — never expose Prometheus unauthenticated in production.
+  global:
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    evaluation_interval: 15s
+    external_labels:
+      cluster: clinicdesk-local
+      environment: demo
+
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+      # Scraped via the Service annotations that helm/clinicdesk sets on
+      # clinicdesk-backend-metrics. The /metrics path is deliberately not under
+      # /api, because only /api/* is routed through the Ingress.
+      - job_name: clinicdesk-api
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - clinicdesk
+        relabel_configs:
+          # Only the Services that carry prometheus.io/scrape: "true".
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          # Honour the path/port annotations rather than assuming a fixed one.
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+  rules.yml:
+    groups:
+      - name: clinicdesk
+        rules:
+          - alert: ClinicDeskApiDown
+            expr: up{job="clinicdesk-api"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "ClinicDesk API is not scrapeable"
+              description: "Prometheus has failed to scrape the API for 2 minutes."
+
+          - alert: ClinicDeskApiHighErrorRate
+            expr: |
+              sum(rate(http_requests_total{status=~"5.."}[5m]))
+                / sum(rate(http_requests_total[5m])) > 0.05
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "More than 5% of ClinicDesk API requests are failing"
+              description: "Server error ratio above 5% over a 5 minute window."
+
+prometheus-node-exporter:
+  enabled: false
+
+kube-state-metrics:
+  enabled: false
+
+pushgateway:
+  enabled: false
+
+alertmanager:
+  enabled: false

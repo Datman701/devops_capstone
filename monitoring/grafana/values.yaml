@@ -1,0 +1,84 @@
+# Grafana values for the ClinicDesk monitoring stack (M9).
+#
+# Deployed with:
+#   helm upgrade --install grafana ./monitoring/grafana \
+#     --namespace monitoring --create-namespace -f monitoring/grafana/values.yaml
+#
+# The dashboard and its Prometheus datasource are provisioned from files in
+# this directory, so the stack comes up showing ClinicDesk metrics with no
+# manual clicking.
+
+replicas: 1
+
+image:
+  repository: grafana/grafana
+  tag: 12.2.0
+  pullPolicy: IfNotPresent
+
+# No persistence: this is a throwaway demo cluster.
+persistence:
+  enabled: false
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+
+adminUser: admin
+adminPassword: clinicdesk
+
+# Only the Prometheus ClusterIP Service may reach the API, so the datasource URL
+# stays internal rather than pointing at an ingress.
+grafana.ini:
+  server:
+    root_url: http://localhost:3000
+  auth:
+    disable_login_form: "false"
+  analytics:
+    reporting_enabled: "false"
+    check_for_updates: "false"
+  unified_alerting:
+    enabled: "false"
+
+sidecar:
+  # Loads every ConfigMap labelled with `dashboard-provider` into Grafana, so
+  # the dashboard appears without anyone clicking through the UI.
+  dashboards:
+    enabled: true
+    label: dashboard-provider
+    folder: /tmp/dashboards
+    searchNamespace: ALL
+    provider:
+      foldersFromFilesStructure: false
+      disableDelete: false
+
+# The dashboard definition lives in monitoring/grafana/dashboards/clinicdesk-api.json
+# and is injected at install time with --set-file, so that file stays the single
+# source of truth instead of being duplicated as inline YAML here.
+#
+# Do NOT set `dashboards.<provider>.<name>.json` by hand here: the chart already
+# generates the provider ConfigMap from whatever it finds in `.Values.dashboards`.
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: clinicdesk-prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-server.monitoring.svc.cluster.local:80
+        isDefault: true
+        editable: true
+        jsonData:
+          timeInterval: 15s
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 512Mi

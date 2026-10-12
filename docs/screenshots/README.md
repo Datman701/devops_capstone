@@ -32,7 +32,15 @@ they show the real containerised application rather than a dev server.
 | 19 | `22-app-via-ingress-appointments.png` | **M8** | Appointments page through the Ingress, Apply filter visible |
 | 20 | `23-app-via-ingress-booking.png` | **M8** | Booking modal through the Ingress — proves browser→nginx→backend works |
 
-Note the numbering gap (`20`–`23` after `16`): the original plan reserved `17`–`19`
+### M9 — Observability (live Prometheus + Grafana)
+
+| # | File | Rubric item | What it shows |
+|---|------|-------------|---------------|
+| 21 | `24-metrics-endpoint.png` | **M9** | Prometheus-formatted output from `/metrics`, including `http_requests_total` and the duration histogram |
+| 22 | `25-prometheus-targets.png` | **M9** | Prometheus Status → Target health, with `clinicdesk-api` **UP** |
+| 23 | `26-grafana-dashboard.png` | **M9** | Provisioned dashboard: 9 panels, all populated — UP, 1.49 req/s, p95 latency, 0.00% errors, 1K requests, plus three time-series charts |
+
+Note the numbering gap (`20`–`26` after `16`): the original plan reserved `17`–`19`
 for the M7 Terraform evidence, which is still blocked on AWS credentials.
 
 ## Still to capture
@@ -40,7 +48,6 @@ for the M7 Terraform evidence, which is still blocked on AWS credentials.
 | Rubric item | Expected file |
 |-------------|---------------|
 | M7 | `17-terraform-plan.png`, `18-aws-vpc-eks.png`, `19-terraform-destroy.png` — **blocked on AWS credentials** |
-| M9 | `24-metrics-endpoint.png`, `25-prometheus-targets.png`, `26-grafana-dashboard.png` |
 
 ## Regenerating
 
@@ -66,6 +73,20 @@ node scripts/render-terminal.mjs /tmp/trivy.txt \
 git log --oneline --graph --decorate > /tmp/gitlog.txt
 node scripts/render-terminal.mjs /tmp/gitlog.txt \
   docs/screenshots/13-git-history.png "commit history"
+```
+
+### Monitoring (M9)
+
+```bash
+# Deploys Prometheus + Grafana into the current cluster
+./scripts/install-monitoring.sh
+
+kubectl port-forward -n monitoring svc/prometheus-server 19090:80 &
+kubectl port-forward -n monitoring svc/grafana 13000:80 &
+
+# Grafana dashboard (admin / clinicdesk)
+node scripts/screenshot-grafana.mjs http://127.0.0.1:13000 \
+  docs/screenshots/26-grafana-dashboard.png
 ```
 
 `render-terminal.mjs` takes a plain text file and renders it in a terminal
