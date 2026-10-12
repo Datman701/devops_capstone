@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "clinicdesk.frontend.fullname" . }}
+  labels:
+    {{- include "clinicdesk.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "clinicdesk.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "clinicdesk.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: frontend
+      annotations:
+        checksum/image: {{ printf "%s:%s" .Values.images.frontend.repository .Values.images.frontend.tag | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "clinicdesk.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.frontend.podAntiAffinity }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "clinicdesk.selectorLabels" . | nindent 20 }}
+                    app.kubernetes.io/component: frontend
+      {{- end }}
+      containers:
+        - name: web
+          image: "{{ .Values.images.frontend.repository }}:{{ .Values.images.frontend.tag }}"
+          imagePullPolicy: {{ .Values.images.frontend.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.containerPort }}
+          # nginx resolves `backend` through cluster DNS, so the reverse proxy
+          # inside the image follows the Service across replica restarts.
+          env:
+            - name: BACKEND_HOST
+              value: "{{ include "clinicdesk.backend.fullname" . }}"
+            - name: BACKEND_PORT
+              value: {{ .Values.backend.containerPort | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            # readOnlyRootFilesystem is on, so every writable path nginx needs
+            # (pid file and all temp paths) is redirected onto this emptyDir.
+            - name: tmp
+              mountPath: /tmp
+            # Rendered by the chart so the upstream points at the release's
+            # Service name instead of the Compose literal `backend`.
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-config
+          configMap:
+            name: {{ include "clinicdesk.frontend.fullname" . }}-nginx
+      {{- with .Values.frontend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clinicdesk.frontend.fullname" . }}
+  labels:
+    {{- include "clinicdesk.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    {{- include "clinicdesk.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend

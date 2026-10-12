@@ -1,0 +1,19 @@
+apiVersion: v2
+name: clinicdesk
+description: ClinicDesk appointment booking console — FastAPI backend, React/nginx frontend and PostgreSQL
+type: application
+
+# Chart version follows the app's own versioning so a release maps back to a
+# commit the same way the container tags do.
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - clinic
+  - appointments
+  - fastapi
+  - react
+
+maintainers:
+  - name: Datman701
+    url: https://github.com/Datman701

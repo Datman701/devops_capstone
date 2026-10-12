@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clinicdesk
+  labels:
+    app.kubernetes.io/name: clinicdesk
+    app.kubernetes.io/part-of: clinicdesk
+    # Label so NetworkPolicies elsewhere can select everything in the app.
+    kubernetes.io/metadata.name: clinicdesk

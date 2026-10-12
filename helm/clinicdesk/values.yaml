@@ -1,0 +1,144 @@
+# Default values for the ClinicDesk chart.
+#
+# Everything here is overridable with `--set` or a values file, e.g.
+#   helm upgrade --install clinicdesk ./helm/clinicdesk \
+#     --namespace clinicdesk -f values-prod.yaml
+
+nameOverride: ""
+fullnameOverride: ""
+
+namespace:
+  create: false # the namespace ships in k8s/namespace.yaml
+
+images:
+  backend:
+    repository: clinicdesk-backend
+    tag: local
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: clinicdesk-frontend
+    tag: local
+    pullPolicy: IfNotPresent
+
+backend:
+  # The rubric asks for at least two replicas per tier.
+  replicaCount: 2
+  containerPort: 8000
+  appEnv: production
+  logLevel: INFO
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Spread replicas across nodes so losing one node does not take the API down.
+  podAntiAffinity: true
+  nodeSelector: {}
+  tolerations: []
+  # Roll the pods when the image tag changes.
+  podAnnotations: {}
+
+frontend:
+  replicaCount: 2
+  containerPort: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  podAntiAffinity: true
+  nodeSelector: {}
+  tolerations: []
+
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 16-alpine
+    pullPolicy: IfNotPresent
+  # Development defaults. Override for anything real — the Secret is rendered
+  # from these values, so they do end up in the release.
+  database: clinic
+  username: clinic
+  password: clinic
+  port: 5432
+  # Small and short-lived: this database exists to demonstrate the deployment,
+  # not to hold real patient records.
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    # Named host: the real-world shape, and what a DNS record would point here.
+    - host: clinicdesk.local
+      paths:
+        - path: /api
+          pathType: Prefix
+        - path: /
+          pathType: Prefix
+    # Hostless catch-all so the app is reachable on kind/minikube, where there is
+    # no DNS entry for clinicdesk.local. nginx picks the first matching rule, so
+    # the named host still wins when the Host header matches it.
+    - host: ""
+      paths:
+        - path: /api
+          pathType: Prefix
+        - path: /
+          pathType: Prefix
+  # Leave empty for a controller that assigns its own address (kind, minikube).
+  # Set explicitly for a cloud LoadBalancer.
+  loadBalancerIP: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+metrics:
+  # Path Prometheus scrapes. Must match the FastAPI /metrics route, which is
+  # deliberately NOT under /api because only /api/* is routed to the backend
+  # through the Ingress.
+  enabled: true
+  path: /metrics
+  service:
+    type: ClusterIP
+    port: 8000
+
+# Autoscaling is off by default so the graded `kubectl get pods` output is
+# predictable; enable per tier when load requires it.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 75

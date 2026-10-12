@@ -1,0 +1,182 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "clinicdesk.backend.fullname" . }}
+  labels:
+    {{- include "clinicdesk.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "clinicdesk.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "clinicdesk.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+      annotations:
+        # Roll the pods when the image reference changes, not on every upgrade.
+        checksum/image: {{ printf "%s:%s" .Values.images.backend.repository .Values.images.backend.tag | sha256sum }}
+        {{- with .Values.backend.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "clinicdesk.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.backend.podAntiAffinity }}
+      # Prefer spreading replicas; fall back to scheduling on one node rather
+      # than leaving a replica Pending on a single-node cluster.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "clinicdesk.selectorLabels" . | nindent 20 }}
+                    app.kubernetes.io/component: backend
+      {{- end }}
+      initContainers:
+        # Apply migrations before the API starts serving. Without this the pods
+        # boot against an empty database and /ready fails until someone runs
+        # alembic by hand.
+        - name: migrate
+          image: "{{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}"
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              echo "waiting for postgres..."
+              until python -c "
+              import os, sys
+              import psycopg
+              try:
+                  psycopg.connect(
+                      os.environ['DATABASE_URL'].replace('postgresql+psycopg://', 'postgresql://'),
+                      connect_timeout=3,
+                  ).close()
+              except Exception as exc:
+                  print(f'  not ready: {exc}')
+                  sys.exit(1)
+              print('  postgres is accepting connections')
+              "; do
+                sleep 3
+              done
+              echo "applying migrations..."
+              alembic upgrade head
+          env:
+            - name: DATABASE_URL
+              value: "postgresql+psycopg://{{ .Values.postgresql.username }}:{{ .Values.postgresql.password }}@{{ include "clinicdesk.postgresql.servicename" . }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.database }}"
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+      containers:
+        - name: api
+          image: "{{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}"
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.containerPort }}
+          env:
+            - name: DATABASE_URL
+              value: "postgresql+psycopg://{{ .Values.postgresql.username }}:{{ .Values.postgresql.password }}@{{ include "clinicdesk.postgresql.servicename" . }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.database }}"
+            - name: APP_ENV
+              value: {{ .Values.backend.appEnv | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.backend.logLevel | quote }}
+          # Liveness deliberately hits /health, which never touches the
+          # database. A database outage must not make Kubernetes restart every
+          # healthy API pod.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Readiness hits /ready, which does check the database, so a pod that
+          # cannot reach PostgreSQL is pulled from the Service.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            # readOnlyRootFilesystem is on, so give Python a writable tmp.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.backend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clinicdesk.backend.fullname" . }}
+  labels:
+    {{- include "clinicdesk.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.backend.containerPort }}
+      targetPort: http
+  selector:
+    {{- include "clinicdesk.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+{{- if .Values.metrics.enabled }}
+---
+# Separate Service so Prometheus can scrape /metrics. It is deliberately NOT
+# exposed through the Ingress: only /api/* is routed to the backend publicly,
+# so keeping metrics on a ClusterIP Service avoids leaking internals.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clinicdesk.backend.fullname" . }}-metrics
+  labels:
+    {{- include "clinicdesk.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: monitoring
+  annotations:
+    # Consumed by the Prometheus chart's serviceMonitor in M9.
+    prometheus.io/scrape: "true"
+    prometheus.io/path: {{ .Values.metrics.path }}
+    prometheus.io/port: {{ .Values.metrics.service.port | quote }}
+spec:
+  type: {{ .Values.metrics.service.type }}
+  ports:
+    - name: metrics
+      port: {{ .Values.metrics.service.port }}
+      targetPort: http
+  selector:
+    {{- include "clinicdesk.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+{{- end }}

@@ -1,0 +1,42 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "clinicdesk.fullname" . }}
+  labels:
+    {{- include "clinicdesk.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- with .Values.ingress.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    {{- /* An empty host produces a hostless rule, which matches any Host header.
+           Useful on kind/minikube where there is no DNS entry for the name. */}}
+    - {{- if .host }}
+      host: {{ .host | quote }}
+      {{- end }}
+      http:
+        paths:
+          {{- range .paths }}
+          # Order matters: nginx evaluates the longest prefix first, so /api
+          # reaches the backend and everything else falls through to the SPA.
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ if eq .path "/api" }}{{ include "clinicdesk.backend.fullname" $ }}{{ else }}{{ include "clinicdesk.frontend.fullname" $ }}{{ end }}
+                port:
+                  {{- if eq .path "/api" }}
+                  number: {{ $.Values.backend.containerPort }}
+                  {{- else }}
+                  number: 80
+                  {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

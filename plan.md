@@ -8,8 +8,8 @@
 - M5 (CI/CD): ✅ COMPLETE — green pipeline, SHA-tagged images in GHCR
 - M6 (DevSecOps): ✅ COMPLETE — Trivy gate on both images, 0 HIGH/CRITICAL
 - M7 (Terraform): ⬜ NOT STARTED
-- M8 (Kubernetes + Helm): ⬜ NOT STARTED
-- M9 (Observability): ⬜ NOT STARTED
+- M8 (Kubernetes + Helm): ✅ COMPLETE — 5 pods Running via Helm on kind
+- M9 (Observability): 🔄 IN PROGRESS
 - M10 (Presentation): ⬜ NOT STARTED
 
 ## Application polish (completed)
@@ -91,12 +91,35 @@ FastAPI 0.14x's internal `_IncludedRouter`. This broke 84/85 tests until fixed.
 - [ ] **BLOCKED: needs AWS credentials + region from the user before apply**
 
 ## M8: Kubernetes + Helm (15 points)
-- [ ] `k8s/namespace.yaml`
-- [ ] `helm/clinicdesk/` chart (Chart.yaml, values.yaml, templates)
-- [ ] 2+ replicas for backend + frontend
-- [ ] ClusterIP Services
-- [ ] Ingress: `/` → frontend, `/api` → backend
-- [ ] Test: helm upgrade --install, pods running
+- [x] `k8s/namespace.yaml` — applies cleanly
+- [x] `helm/clinicdesk/` chart (Chart.yaml, values.yaml, templates)
+- [x] 2+ replicas for backend + frontend (2 each, `maxUnavailable: 0` rolling update)
+- [x] ClusterIP Services — backend, frontend, postgres, plus a metrics Service
+- [x] Ingress: `/api` → backend, `/` → frontend
+- [x] Test: `helm upgrade --install` deploys cleanly; all 5 pods Running
+
+### M8 verification
+Deployed to a local `kind` cluster with `helm upgrade --install clinicdesk ./helm/clinicdesk
+--namespace clinicdesk --wait`. Result: 5/5 pods Running (2 backend, 2 frontend, 1 postgres),
+all ClusterIP Services healthy, ingress-nginx controller routing both paths, and the full
+appointment filter contract re-verified in a real browser **through the Ingress**.
+
+Design decisions worth knowing:
+- **Migrations run as an initContainer.** Without it the pods boot against an empty
+  database and `/ready` fails until someone runs `alembic` by hand. It waits for
+  PostgreSQL to accept connections first, then runs `alembic upgrade head`.
+- **Liveness uses `/health`, readiness uses `/ready`.** `/health` never touches the
+  database, so a database outage cannot make Kubernetes restart every healthy API pod.
+- **The nginx config is templated by the chart.** The image ships a Compose config
+  pointing at the literal host `backend`; in Kubernetes the Service name depends on the
+  release, so a ConfigMap renders the main `nginx.conf` with the correct upstream.
+- **readOnlyRootFilesystem** is on for both app containers. That forced the nginx pid file
+  and every temp path onto a `/tmp` emptyDir, which is only settable in the main
+  nginx.conf — hence mounting the whole file rather than just `conf.d`.
+- **A hostless Ingress rule** is included alongside the named `clinicdesk.local` host so
+  the app is reachable on kind/minikube, where no DNS entry exists.
+- **Pod anti-affinity is `preferred`, not required**, so replicas spread across nodes but
+  still schedule on a single-node cluster instead of leaving one Pending.
 
 ## M9: Observability (10 points)
 - [x] Backend `/metrics` endpoint (Prometheus instrumentation already present, verified 200)

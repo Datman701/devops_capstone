@@ -1,0 +1,32 @@
+ClinicDesk {{ .Chart.AppVersion }} is installed as release {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+Images:
+  backend  {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }} ({{ .Values.backend.replicaCount }} replicas)
+  frontend {{ .Values.images.frontend.repository }}:{{ .Values.images.frontend.tag }} ({{ .Values.frontend.replicaCount }} replicas)
+{{- if .Values.postgresql.enabled }}
+  postgres {{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}
+{{- end }}
+
+1. Watch the rollout (migrations run as an initContainer, so wait for Ready):
+
+   kubectl rollout status deploy/{{ include "clinicdesk.backend.fullname" . }} -n {{ .Release.Namespace }}
+   kubectl get pods -n {{ .Release.Namespace }}
+
+2. Reach the application{{ if .Values.ingress.enabled }}:
+
+   kubectl port-forward -n {{ .Release.Namespace }} svc/ingress-nginx-controller 8080:80{{ if .Values.ingress.hosts }}
+
+   Then open http://localhost:8080 with the Host header set to {{ (first .Values.ingress.hosts).host | quote }},
+   or add that host to /etc/hosts pointing at the controller address.{{ end }}{{ else }}:
+
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "clinicdesk.frontend.fullname" . }} 3000:80{{ end }}
+
+   Verify the API is reachable through the same entry point:
+
+   curl http://localhost:8080/api/health   # or :3000/api/health without the Ingress
+
+3. Metrics{{ if .Values.metrics.enabled }} (Prometheus target annotations are set on this Service):
+
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "clinicdesk.backend.fullname" . }}-metrics {{ .Values.metrics.service.port }}:{{ .Values.metrics.service.port }}
+   curl http://localhost:{{ .Values.metrics.service.port }}{{ .Values.metrics.path }}
+{{- else }} is disabled.{{ end }}

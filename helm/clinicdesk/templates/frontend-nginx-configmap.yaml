@@ -1,0 +1,102 @@
+{{/*
+The image ships an nginx.conf tuned for Docker Compose, where the backend is
+always reachable at the literal host `backend`.
+
+In Kubernetes the Service name depends on the release, so the upstream has to be
+rendered here. The whole main nginx.conf is mounted (not just conf.d) because a
+read-only root filesystem forces the pid file and every temp path onto the
+/tmp emptyDir, and `pid` can only be set in the main context.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "clinicdesk.frontend.fullname" . }}-nginx
+  labels:
+    {{- include "clinicdesk.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+data:
+  nginx.conf: |
+    worker_processes auto;
+    error_log /dev/stderr warn;
+    # /tmp is an emptyDir, so this is writable under readOnlyRootFilesystem.
+    pid /tmp/nginx.pid;
+
+    events {
+        worker_connections 1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        log_format main '$remote_addr - $status "$request" '
+                        'rt=$request_time uct="$upstream_response_time"';
+        access_log /dev/stdout main;
+
+        sendfile on;
+        tcp_nopush on;
+        keepalive_timeout 65;
+
+        # Every temp path must live on the writable emptyDir.
+        client_body_temp_path /tmp/client_temp;
+        proxy_temp_path       /tmp/proxy_temp;
+        fastcgi_temp_path     /tmp/fastcgi_temp;
+        uwsgi_temp_path       /tmp/uwsgi_temp;
+        scgi_temp_path        /tmp/scgi_temp;
+
+        include /etc/nginx/conf.d/*.conf;
+    }
+  default.conf: |
+    upstream clinicdesk_backend {
+        # Service name, so cluster DNS resolves it and the proxy follows the
+        # Service across pod restarts.
+        server {{ include "clinicdesk.backend.fullname" . }}:{{ .Values.backend.containerPort }};
+    }
+
+    server {
+        listen {{ .Values.frontend.containerPort }};
+        server_name _;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location = /healthz {
+            access_log off;
+            add_header Content-Type text/plain;
+            return 200 'ok';
+        }
+
+        location /api/ {
+            proxy_pass http://clinicdesk_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 60s;
+        }
+
+        # Client-side routes such as /appointments must fall through to
+        # index.html, otherwise a refresh on a deep link returns 404.
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        location /assets/ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            try_files $uri =404;
+        }
+
+        location = /index.html {
+            add_header Cache-Control "no-store, no-cache, must-revalidate";
+        }
+
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options SAMEORIGIN always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+        gzip on;
+        gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+        gzip_min_length 1024;
+    }

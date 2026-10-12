@@ -23,15 +23,23 @@ they show the real containerised application rather than a dev server.
 | 15 | `15-ghcr-packages.png` | **M5** | GHCR package list showing `backend` and `frontend` |
 | 16 | `16-ghcr-backend-tags.png` | **M5** | Package page showing SHA-based tags (short and full) |
 
-## Still to capture
+### M8 — Kubernetes + Helm (captured from a live kind cluster)
 
-These depend on infrastructure that is not built yet, and will be added as the
-remaining modules land.
+| # | File | Rubric item | What it shows |
+|---|------|-------------|---------------|
+| 17 | `20-kubectl-resources.png` | **M8** | `kubectl get pods` (5 Running), `kubectl get svc` (ClusterIP), `kubectl get ingress`, `helm list` |
+| 18 | `21-app-via-ingress-dashboard.png` | **M8** | Dashboard reached through the Ingress, with live seeded data |
+| 19 | `22-app-via-ingress-appointments.png` | **M8** | Appointments page through the Ingress, Apply filter visible |
+| 20 | `23-app-via-ingress-booking.png` | **M8** | Booking modal through the Ingress — proves browser→nginx→backend works |
+
+Note the numbering gap (`20`–`23` after `16`): the original plan reserved `17`–`19`
+for the M7 Terraform evidence, which is still blocked on AWS credentials.
+
+## Still to capture
 
 | Rubric item | Expected file |
 |-------------|---------------|
 | M7 | `17-terraform-plan.png`, `18-aws-vpc-eks.png`, `19-terraform-destroy.png` — **blocked on AWS credentials** |
-| M8 | `20-kubectl-pods.png`, `21-kubectl-svc.png`, `22-helm-list.png`, `23-app-via-ingress.png` |
 | M9 | `24-metrics-endpoint.png`, `25-prometheus-targets.png`, `26-grafana-dashboard.png` |
 
 ## Regenerating
