@@ -1,13 +1,5 @@
 # Submission Screenshots
 
-Every graded artifact in one place, each with what it demonstrates and which
-rubric item it satisfies.
-
-Most images were generated headlessly with local capture tooling that is not part
-of the repository (see [Regenerating](#regenerating)). The exceptions are the AWS
-Console captures in shots 18 and 19, which can only be taken by hand while the
-stack is up.
-
 ---
 
 ## M1 — Application (10 points)
