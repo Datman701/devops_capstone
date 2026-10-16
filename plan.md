@@ -178,4 +178,7 @@ Two things the work surfaced:
 - [x] Rewrite `README.md` — Docker, CI/CD, Terraform, Kubernetes and monitoring sections, refreshed project layout and status table
 - [x] `screenshots.md` — every screenshot in one place, annotated with what it shows and which rubric item it satisfies
 - [x] `scripts/screenshots.sh` — regenerates the whole screenshot set (`app`, `terminal`, `k8s`, `monitoring` or `all`)
-- [ ] Live demo: commit a change, watch the pipeline run, see the deployment update
+- [x] Build SHA badge in the UI — the running image reports the commit it was built from
+- [x] `scripts/demo-deploy.sh` — one-command deploy of a commit's GHCR images via Helm
+- [x] `DEMO.md` — timed live-demo runbook (commit → pipeline → rolling update), with a kind fallback
+- [ ] Record / deliver the live demo at the presentation
