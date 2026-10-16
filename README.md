@@ -9,8 +9,6 @@ containers, a gated CI/CD pipeline with container scanning, AWS infrastructure
 code, a Helm chart for Kubernetes, and Prometheus/Grafana monitoring.
 
 **Evidence for every module is collected in [`screenshots.md`](screenshots.md).**
-The end-to-end walkthrough — commit, pipeline, deployment — is in
-[`DEMO.md`](DEMO.md).
 
 ## Tech stack
 
@@ -88,9 +86,7 @@ clinic-desk/
 │   └── security.md              Trivy findings and remediations
 ├── demo/                        Slide deck (PPTX/PDF) and the demo video
 ├── screenshots.md               Screenshot index — annotated, mapped to the rubric
-├── DEMO.md                      Live-demo runbook (commit → pipeline → deploy)
-├── scripts/                     Dev helpers, smoke tests, screenshot tooling
-└── plan.md                      Module checklist with completion evidence
+└── scripts/                     Dev helpers, smoke tests, screenshot tooling
 ```
 
 ## Running it
@@ -433,5 +429,4 @@ node scripts/e2e-ui-smoke.mjs   # books an appointment through the real UI
 | Observability | ✅ Done — target UP, 9 live Grafana panels | [§9](screenshots.md#m9--observability-10-points) |
 
 The Terraform stack was applied against a real AWS account and then destroyed,
-so nothing is left billing. Details are in
-[M7 apply and destroy](plan.md#m7-apply-and-destroy).
+so nothing is left billing.
