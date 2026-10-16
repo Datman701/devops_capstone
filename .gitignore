@@ -60,10 +60,3 @@ nohup.out
 # Stray browser captures at the repo root
 /image*.png
 /*.jpg
-
-# Local-only screenshot tooling - kept on this machine, never shipped
-scripts/screenshots.sh
-scripts/screenshots.mjs
-scripts/screenshot-grafana.mjs
-scripts/shot.mjs
-scripts/render-terminal.mjs
