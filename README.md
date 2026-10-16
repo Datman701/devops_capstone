@@ -8,7 +8,7 @@ This repository covers the application *and* its full DevOps lifecycle —
 containers, a gated CI/CD pipeline with container scanning, AWS infrastructure
 code, a Helm chart for Kubernetes, and Prometheus/Grafana monitoring.
 
-**Evidence for every module is collected in [`docs/screenshots.md`](docs/screenshots.md).**
+**Evidence for every module is collected in [`screenshots.md`](screenshots.md).**
 
 ## Tech stack
 
@@ -80,9 +80,9 @@ clinic-desk/
 │   └── grafana/                 Datasource + provisioned dashboard
 ├── terraform/                   VPC with public subnets + EKS cluster
 ├── docs/
-│   ├── screenshots.md           Every submission screenshot, annotated
-│   ├── screenshots/             The images themselves
+│   ├── screenshots/             Every submission screenshot
 │   └── security.md              Trivy findings and remediations
+├── screenshots.md               Screenshot index — annotated, mapped to the rubric
 ├── scripts/                     Dev helpers, smoke tests, screenshot tooling
 └── plan.md                      Module checklist with completion evidence
 ```
@@ -387,16 +387,16 @@ node scripts/shot.mjs http://127.0.0.1:5173 /tmp/dashboard.png
 
 | Area | State | Evidence |
 |---|---|---|
-| Backend + REST API | ✅ Done | [`docs/screenshots.md` §1](docs/screenshots.md#m1--application-10-points) |
+| Backend + REST API | ✅ Done | [`screenshots.md` §1](screenshots.md#m1--application-10-points) |
 | Database + Alembic | ✅ Done | M1 |
-| Tests | ✅ Done — 85 passing | [§2](docs/screenshots.md#m2--testing-10-points) |
+| Tests | ✅ Done — 85 passing | [§2](screenshots.md#m2--testing-10-points) |
 | Frontend dashboard | ✅ Done — responsive | §1 |
-| Docker / Compose | ✅ Done — 3 healthy services, non-root | [§4](docs/screenshots.md#m4--docker-10-points) |
-| CI/CD + GHCR | ✅ Done — green pipeline, SHA tags | [§5](docs/screenshots.md#m5--cicd-15-points) |
-| Security scanning | ✅ Done — 0 HIGH / 0 CRITICAL | [§6](docs/screenshots.md#m6--devsecops-5-points) |
-| Terraform (VPC + EKS) | 🟡 Code complete and validated — needs a real `apply` | [§7](docs/screenshots.md#m7--terraform-15-points) |
-| Kubernetes + Helm | ✅ Done — 5 pods Running via Ingress | [§8](docs/screenshots.md#m8--kubernetes--helm-15-points) |
-| Observability | ✅ Done — target UP, 9 live Grafana panels | [§9](docs/screenshots.md#m9--observability-10-points) |
+| Docker / Compose | ✅ Done — 3 healthy services, non-root | [§4](screenshots.md#m4--docker-10-points) |
+| CI/CD + GHCR | ✅ Done — green pipeline, SHA tags | [§5](screenshots.md#m5--cicd-15-points) |
+| Security scanning | ✅ Done — 0 HIGH / 0 CRITICAL | [§6](screenshots.md#m6--devsecops-5-points) |
+| Terraform (VPC + EKS) | 🟡 Code complete and validated — needs a real `apply` | [§7](screenshots.md#m7--terraform-15-points) |
+| Kubernetes + Helm | ✅ Done — 5 pods Running via Ingress | [§8](screenshots.md#m8--kubernetes--helm-15-points) |
+| Observability | ✅ Done — target UP, 9 live Grafana panels | [§9](screenshots.md#m9--observability-10-points) |
 
 The only outstanding item is running `terraform apply` against a real AWS
 account to produce the console and teardown screenshots.

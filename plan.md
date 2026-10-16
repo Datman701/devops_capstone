@@ -10,7 +10,7 @@
 - M7 (Terraform): 🟡 CODE COMPLETE — 27 resources planned & validated; needs a real `apply` for the console screenshots
 - M8 (Kubernetes + Helm): ✅ COMPLETE — 5 pods Running via Helm on kind
 - M9 (Observability): ✅ COMPLETE — Prometheus scraping, Grafana dashboard live
-- M10 (Presentation + Docs): ✅ COMPLETE — README rewritten, docs/screenshots.md indexes all 24 images
+- M10 (Presentation + Docs): ✅ COMPLETE — README rewritten, screenshots.md indexes all 24 images
 
 ## Application polish (completed)
 - [x] Appointments filter requires an explicit **Apply filter** action (draft vs applied state)
@@ -176,6 +176,6 @@ Two things the work surfaced:
 
 ## M10: Presentation (5 points)
 - [x] Rewrite `README.md` — Docker, CI/CD, Terraform, Kubernetes and monitoring sections, refreshed project layout and status table
-- [x] `docs/screenshots.md` — every screenshot in one place, annotated with what it shows and which rubric item it satisfies
+- [x] `screenshots.md` — every screenshot in one place, annotated with what it shows and which rubric item it satisfies
 - [x] `scripts/screenshots.sh` — regenerates the whole screenshot set (`app`, `terminal`, `k8s`, `monitoring` or `all`)
 - [ ] Live demo: commit a change, watch the pipeline run, see the deployment update
