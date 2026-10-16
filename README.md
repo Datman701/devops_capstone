@@ -24,6 +24,7 @@ The end-to-end walkthrough — commit, pipeline, deployment — is in
 | CI/CD | GitHub Actions, GHCR, Trivy |
 | IaC | Terraform (VPC + EKS) |
 | Orchestration | Helm, Kubernetes, ingress-nginx |
+| GitOps | ArgoCD |
 | Monitoring | Prometheus, Grafana |
 | Tooling | uv (Python 3.12), ruff, Node 22+ |
 
@@ -77,6 +78,7 @@ clinic-desk/
 ├── .github/workflows/ci.yml     Tests → builds → scans → publishes to GHCR
 ├── helm/clinicdesk/             Chart for the Kubernetes deployment
 ├── k8s/namespace.yaml
+├── argocd/application.yaml      ArgoCD Application — GitOps source of truth
 ├── monitoring/
 │   ├── prometheus/values.yaml   Scrape config + alert rules
 │   └── grafana/                 Datasource + provisioned dashboard
@@ -84,6 +86,7 @@ clinic-desk/
 ├── docs/
 │   ├── screenshots/             Every submission screenshot
 │   └── security.md              Trivy findings and remediations
+├── demo/                        Slide deck (PPTX/PDF) and the demo video
 ├── screenshots.md               Screenshot index — annotated, mapped to the rubric
 ├── DEMO.md                      Live-demo runbook (commit → pipeline → deploy)
 ├── scripts/                     Dev helpers, smoke tests, screenshot tooling
@@ -254,6 +257,34 @@ kubectl set image deploy/clinicdesk-backend \
 kubectl rollout status deploy/clinicdesk-backend -n clinicdesk
 ```
 
+## GitOps with ArgoCD
+
+The Kubernetes deployment is declarative and Git-driven:
+[`argocd/application.yaml`](argocd/application.yaml) points ArgoCD at the Helm
+chart in this repository, and ArgoCD continuously reconciles the cluster to
+match it — automated sync with `prune` and `selfHeal`.
+
+```bash
+kubectl create namespace argocd
+kubectl apply --server-side -n argocd \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+kubectl apply -f argocd/application.yaml
+kubectl -n argocd get application clinicdesk      # Synced / Healthy
+```
+
+Git is the single source of truth: manual drift is reverted automatically, and a
+rollback is a `git revert`. The image coordinates CI publishes are pinned in the
+Application's `helm.parameters`.
+
+```bash
+kubectl -n argocd port-forward svc/argocd-server 18081:80
+# open http://localhost:18081
+```
+
+The imperative `helm upgrade` commands above remain useful for local
+development, but the graded deployment is driven by ArgoCD.
+
 ## Monitoring
 
 ```bash
@@ -397,9 +428,11 @@ node scripts/shot.mjs http://127.0.0.1:5173 /tmp/dashboard.png
 | Docker / Compose | ✅ Done — 3 healthy services, non-root | [§4](screenshots.md#m4--docker-10-points) |
 | CI/CD + GHCR | ✅ Done — green pipeline, SHA tags | [§5](screenshots.md#m5--cicd-15-points) |
 | Security scanning | ✅ Done — 0 HIGH / 0 CRITICAL | [§6](screenshots.md#m6--devsecops-5-points) |
-| Terraform (VPC + EKS) | 🟡 Code complete and validated — needs a real `apply` | [§7](screenshots.md#m7--terraform-15-points) |
+| Terraform (VPC + EKS) | ✅ Done — applied to AWS, then destroyed and verified clean | [§7](screenshots.md#m7--terraform-15-points) |
 | Kubernetes + Helm | ✅ Done — 5 pods Running via Ingress | [§8](screenshots.md#m8--kubernetes--helm-15-points) |
+| GitOps (ArgoCD) | ✅ Done — application Synced / Healthy | [above](#gitops-with-argocd) |
 | Observability | ✅ Done — target UP, 9 live Grafana panels | [§9](screenshots.md#m9--observability-10-points) |
 
-The only outstanding item is running `terraform apply` against a real AWS
-account to produce the console and teardown screenshots.
+The Terraform stack was applied against a real AWS account and then destroyed,
+so nothing is left billing. Details are in
+[M7 apply and destroy](plan.md#m7-apply-and-destroy).

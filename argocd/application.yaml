@@ -1,0 +1,42 @@
+# ArgoCD Application — GitOps source of truth for ClinicDesk.
+#
+# ArgoCD watches this chart in the Git repository and continuously reconciles
+# the cluster to match it (Synced / Healthy). Nothing is deployed by hand:
+# change the repo, ArgoCD applies the change.
+#
+#   kubectl apply -f argocd/application.yaml
+#
+# The image coordinates are pinned here so the graded deployment runs the
+# exact images CI published to GHCR (tagged with the commit SHA).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clinicdesk
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Datman701/devops_capstone.git
+    targetRevision: main
+    path: helm/clinicdesk
+    helm:
+      parameters:
+        - name: images.backend.repository
+          value: ghcr.io/datman701/devops_capstone/backend
+        - name: images.backend.tag
+          value: "29d8734"
+        - name: images.frontend.repository
+          value: ghcr.io/datman701/devops_capstone/frontend
+        - name: images.frontend.tag
+          value: "29d8734"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: clinicdesk
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

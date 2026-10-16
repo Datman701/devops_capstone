@@ -16,7 +16,7 @@ screen:
 
 ```
 commit a change  →  Actions builds an image tagged with the new SHA  →
-helm rolls the pods onto that SHA  →  the badge in the browser changes
+ArgoCD syncs that SHA onto the cluster  →  the badge in the browser changes
 ```
 
 No screenshots can fake that, because the number on screen is produced by the
@@ -34,6 +34,8 @@ talking, so the live steps are only the interesting ones.
 kubectl get pods -n clinicdesk          # 5 pods Running
 kubectl get pods -n ingress-nginx       # controller Running
 kubectl get pods -n monitoring          # prometheus + grafana Running
+kubectl get pods -n argocd              # argo-cd pods Running
+kubectl -n argocd get application clinicdesk   # Synced / Healthy
 
 # 2. Last pipeline run is green
 gh run list --limit 3
@@ -50,7 +52,7 @@ xdg-open http://localhost:18080
 
 If `monitoring` or `ingress-nginx` pods are missing, the cluster was recreated —
 reinstall with `./scripts/install-monitoring.sh` and the ingress manifest, then
-re-run `./scripts/demo-deploy.sh`.
+re-apply the ArgoCD Application: `kubectl apply -f argocd/application.yaml`.
 
 > **Cluster was asleep?** `kind` clusters stop when Docker restarts. Start it
 > with `docker start clinicdesk-control-plane`, then wait for the API:
@@ -101,28 +103,28 @@ Walk through the jobs as they light up, mapping each to a rubric item:
 Say explicitly: **the scan runs before the push**, so a vulnerable image can
 never reach the registry.
 
-### 4. Deploy the new build (1-2 min)
+### 4. Let ArgoCD deploy the new build (1-2 min)
+
+Deployment is GitOps, not a manual `helm upgrade`. The image coordinates the
+pipeline published live in [`argocd/application.yaml`](argocd/application.yaml).
 
 ```bash
-./scripts/demo-deploy.sh
+# Point the two image tags at the SHA the pipeline just published:
+#   spec.source.helm.parameters → images.backend.tag / images.frontend.tag
+$EDITOR argocd/application.yaml
+git add argocd/application.yaml
+git commit -m "chore(gitops): deploy <sha>"
+git push origin main
+
+# Hand the new desired state to ArgoCD
+kubectl apply -f argocd/application.yaml
 ```
 
-With no argument it takes the current commit's short SHA — the one the pipeline
-just published. It runs `helm upgrade --install` pinned to
-`ghcr.io/datman701/devops_capstone/{backend,frontend}:<sha>`, waits for the
-rollout, then prints the running images.
+ArgoCD renders `helm/clinicdesk` from Git and rolls the pods onto the new SHA —
+no imperative command touches the cluster. Watch it converge:
 
-The output to point at:
-
-```
-deployment "clinicdesk-backend" successfully rolled out
-deployment "clinicdesk-frontend" successfully rolled out
-
-POD                                    IMAGE
-clinicdesk-backend-...-tvrmd           ghcr.io/datman701/devops_capstone/backend:<sha>
-clinicdesk-backend-...-v46j7           ghcr.io/datman701/devops_capstone/backend:<sha>
-clinicdesk-frontend-...-7fdlg          ghcr.io/datman701/devops_capstone/frontend:<sha>
-clinicdesk-frontend-...-sqc65          ghcr.io/datman701/devops_capstone/frontend:<sha>
+```bash
+kubectl -n argocd get application clinicdesk -w      # Synced / Healthy
 ```
 
 ### 5. See the deployment update (30 s)
@@ -141,6 +143,10 @@ Reload `http://localhost:18080`. Two things changed:
 # Zero-downtime: old pods stayed up until new ones were Ready
 kubectl -n clinicdesk rollout history deploy/clinicdesk-frontend
 
+# ArgoCD UI — the synced application and its Git source
+kubectl port-forward -n argocd svc/argocd-server 18081:80
+# open http://localhost:18081 — the app card shows Synced / Healthy
+
 # Observability picks up the new pods
 kubectl port-forward -n monitoring svc/grafana 13000:80
 # open http://localhost:13000 (admin / clinicdesk) — request rate still climbing
@@ -148,33 +154,24 @@ kubectl port-forward -n monitoring svc/grafana 13000:80
 
 ---
 
-## If there is no cloud cluster
+## About the cluster
 
-M7 (real AWS `apply`) is blocked. That is **not** a blocker for this demo: the
-deployment half runs on the local `kind` cluster, which is a real Kubernetes API
-and a real Ingress. Say so plainly rather than hiding it:
-
-> "The cluster is `kind` running on this machine rather than EKS. The manifests
-> are identical — `helm upgrade` is the same command — so the pipeline-to-
-> deployment flow you're watching is the production flow. The Terraform that
-> would provision the EKS cluster it should run on is in `terraform/`."
+The deployment runs on a local `kind` cluster — a real Kubernetes API server and
+a real Ingress, not a mock. ArgoCD syncs the very same Helm chart that the
+Terraform-provisioned EKS cluster (in [`terraform/`](terraform/)) would run; only
+the location of the control plane differs.
 
 ---
 
 ## Reset afterwards
 
 ```bash
-# Put the cluster back on the locally-built images
-helm upgrade --install clinicdesk helm/clinicdesk -n clinicdesk \
-  --set images.backend.repository=clinicdesk-backend --set images.backend.tag=local \
-  --set images.frontend.repository=clinicdesk-frontend --set images.frontend.tag=local
+# Return ArgoCD to the pinned SHA: edit the tags in argocd/application.yaml, then
+kubectl apply -f argocd/application.yaml
 ```
 
-If you provisioned AWS for M7, the last step of the whole submission is:
-
-```bash
-terraform -chdir=terraform destroy
-```
+The Terraform stack was applied and then destroyed, so nothing is left billing.
+See [M7 apply and destroy](plan.md#m7-apply-and-destroy).
 
 ---
 
@@ -189,6 +186,7 @@ terraform -chdir=terraform destroy
 | M5 CI/CD | The whole pipeline, SHA tags in the push step |
 | M6 DevSecOps | Trivy job failing the build before the push |
 | M8 Kubernetes | `kubectl get pods`, rolling update, Ingress routing |
+| GitOps | ArgoCD application Synced / Healthy — Git is the source of truth |
 | M9 Observability | Grafana request rate followed by dashboard |
 | M10 Docs/Demo | This runbook, plus `screenshots.md` |
-| M7 Terraform | Shown as code + plan only — needs AWS creds to apply |
+| M7 Terraform | Infra as code + plan; applied to AWS, then destroyed |
