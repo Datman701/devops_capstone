@@ -56,7 +56,6 @@ nohup.out
 *.swp
 *.swo
 *~
-.opencode/
 
 # Stray browser captures at the repo root
 /image*.png
@@ -68,7 +67,3 @@ scripts/screenshots.mjs
 scripts/screenshot-grafana.mjs
 scripts/shot.mjs
 scripts/render-terminal.mjs
-
-# Agent working notes - deliberately never committed
-handoff.md
-VIDEO-SCRIPT.md

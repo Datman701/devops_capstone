@@ -3,7 +3,7 @@
 set -euo pipefail
 
 FRONTEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/frontend"
-LOG="${LOG:-/tmp/opencode/clinicdesk-web.log}"
+LOG="${LOG:-/tmp/clinicdesk/clinicdesk-web.log}"
 
 cd "$FRONTEND_DIR"
 setsid npm run dev -- --host 127.0.0.1 --port 5173 >"$LOG" 2>&1 </dev/null &

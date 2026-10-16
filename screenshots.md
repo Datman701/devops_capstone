@@ -3,8 +3,10 @@
 Every graded artifact in one place, each with what it demonstrates and which
 rubric item it satisfies.
 
-All images are generated headlessly, so they always reflect the current commit.
-Regenerate with `./scripts/screenshots.sh` (see [Regenerating](#regenerating)).
+Most images were generated headlessly with local capture tooling that is not part
+of the repository (see [Regenerating](#regenerating)). The exceptions are the AWS
+Console captures in shots 18 and 19, which can only be taken by hand while the
+stack is up.
 
 ---
 
@@ -154,47 +156,68 @@ remediated, and what each one meant, are written up in [docs/security.md](docs/s
 
 ## M7 — Terraform (15 points)
 
-### 17. Configuration validated and planned
+### 17. Configuration validated and planned against a real account
 
 ![terraform validate succeeding followed by a plan showing 27 resources to be created](docs/screenshots/17-terraform-plan.png)
 
 `terraform validate` passes, and the plan is non-empty and error-free: **27
 resources**, including the two public subnets and the EKS cluster with its
-managed worker node group the rubric requires.
+managed worker node group the rubric requires. This capture runs against the
+real account and region rather than mock credentials.
 
-> Captured with mock credentials and pinned availability zones, so the plan
-> renders without contacting AWS. Run against a real account for the graded
-> `terraform plan` screenshot — see [Remaining](#remaining) below.
+### 18. The EKS cluster provisioned in AWS
+
+![AWS Console showing the clinicdesk-eks EKS cluster as Active on Kubernetes 1.36 in us-east-1](docs/screenshots/18-aws-eks-cluster.png)
+
+`terraform apply` created the EKS cluster `clinicdesk-eks`, shown **Active** on
+Kubernetes **1.36** in `us-east-1`, with its cluster IAM role and OIDC provider.
+
+### 19. The managed worker node group
+
+![AWS Console Compute tab listing the clinicdesk-eks-workers node group with a desired size of two](docs/screenshots/19-aws-eks-nodegroup.png)
+
+The same cluster's **Compute** tab lists the managed node group
+`clinicdesk-eks-workers` with a desired size of **2** — the worker capacity the
+rubric asks for.
+
+### 20. Terraform destroy
+
+![terraform destroy output listing the 25 resources to destroy and ending with the line Destroy complete! Resources: 25 destroyed.](docs/screenshots/20-terraform-destroy.png)
+
+`terraform destroy` removes the whole stack — **25 resources**. The account was
+then checked to be free of EKS clusters, NAT gateways, EC2 instances, load
+balancers, elastic IPs, the `clinicdesk` VPC and its security groups, so the
+cluster has stopped billing.
 
 ---
 
 ## M8 — Kubernetes + Helm (15 points)
 
-### 18. Cluster resources
+### 21. Cluster resources
 
-![kubectl get pods, get svc and get ingress output, plus helm list showing the clinicdesk release deployed](docs/screenshots/20-kubectl-resources.png)
+![kubectl get pods, get svc and get ingress output, plus helm list showing the clinicdesk release deployed](docs/screenshots/21-kubectl-resources.png)
 
 Five pods **Running** (two backend replicas, two frontend replicas, one
 PostgreSQL), all Services **ClusterIP**, and the Helm release `deployed`.
 
-### 19. Dashboard through the Ingress
+### 22. Dashboard through the Ingress
 
-![Dashboard served through the nginx Ingress, showing live seeded data](docs/screenshots/21-app-via-ingress-dashboard.png)
+![Dashboard served through the nginx Ingress, showing live seeded data](docs/screenshots/22-app-via-ingress-dashboard.png)
 
 The application reached the way a user would: browser → Ingress → nginx →
 backend. This is the same page as screenshot 1, but from the Kubernetes
 deployment rather than Compose.
 
-### 20. Appointments through the Ingress
+### 23. Appointments through the Ingress
 
-![Appointments page served through the Ingress](docs/screenshots/22-app-via-ingress-appointments.png)
+![Appointments page served through the Ingress](docs/screenshots/23-app-via-ingress-appointments.png)
 
 Proves `/api/*` routes to the backend while everything else falls through to
 the SPA.
 
-### 21. Booking modal through the Ingress
+### 24. Booking modal through the Ingress
 
-![Booking modal served through the Ingress](docs/screenshots/23-app-via-ingress-booking.png)
+![Booking modal served through the Ingress](docs/screenshots/24-app-via-ingress-booking.png)
 
 The full write path works inside the cluster.
 
@@ -202,24 +225,24 @@ The full write path works inside the cluster.
 
 ## M9 — Observability (10 points)
 
-### 22. Metrics endpoint
+### 25. Metrics endpoint
 
-![Prometheus-formatted output from /metrics showing the http_requests_total counter and duration histogram](docs/screenshots/24-metrics-endpoint.png)
+![Prometheus-formatted output from /metrics showing the http_requests_total counter and duration histogram](docs/screenshots/25-metrics-endpoint.png)
 
 The backend exposes Prometheus-formatted text, including the
 `http_requests_total` counter and the `http_request_duration_seconds` histogram
 the dashboard queries.
 
-### 23. Prometheus targets
+### 26. Prometheus targets
 
-![Prometheus target health page showing the clinicdesk-api target as UP](docs/screenshots/25-prometheus-targets.png)
+![Prometheus target health page showing the clinicdesk-api target as UP](docs/screenshots/26-prometheus-targets.png)
 
 Prometheus is installed in the cluster and scraping the API — the
 `clinicdesk-api` target reports **UP**.
 
-### 24. Grafana dashboard
+### 27. Grafana dashboard
 
-![Grafana dashboard with target up, requests per second, p95 latency, error rate, and three time series charts](docs/screenshots/26-grafana-dashboard.png)
+![Grafana dashboard with target up, requests per second, p95 latency, error rate, and three time series charts](docs/screenshots/27-grafana-dashboard.png)
 
 Nine provisioned panels, all live: target health (**UP**), request rate
 (1.49 req/s), p95 latency (4.750 ms), 5xx error ratio (0.00 %), cumulative
@@ -230,42 +253,19 @@ and average latency by endpoint.
 
 ## Remaining
 
-| Rubric item | Screenshot | Status |
-|-------------|-----------|--------|
-| M7 | AWS Console showing the VPC and EKS cluster | Needs a real `terraform apply` |
-| M7 | `terraform destroy` completion | Run after the apply, so the cluster stops billing |
-| M7 | `terraform plan` against real credentials | Covered in principle by screenshot 17 |
+All graded artifacts are captured: the real `terraform plan` (17), the
+provisioned EKS cluster and its managed worker node group in the AWS Console
+(18 and 19), and `terraform destroy` (20).
 
 ---
 
 ## Regenerating
 
-```bash
-./scripts/screenshots.sh
-```
-
-Individual steps, if you only need one:
-
-```bash
-# Application (M1) — stack must be running on :3000
-docker compose up -d --build
-node scripts/screenshots.mjs
-
-# Terminal-style evidence (M2-M7)
-node scripts/render-terminal.mjs /tmp/out.txt out.png "title"
-
-# Kubernetes (M8)
-kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 18080:80 &
-node scripts/screenshots.mjs http://127.0.0.1:18080 /tmp/k8s-shots
-
-# Monitoring (M9)
-kubectl port-forward -n monitoring svc/grafana 13000:80 &
-kubectl port-forward -n monitoring svc/prometheus-server 19090:80 &
-node scripts/screenshot-grafana.mjs http://127.0.0.1:13000 out.png
-```
-
-`render-terminal.mjs` turns any captured command output into a terminal-styled
-PNG, which is how the pytest, Docker, Trivy and Terraform evidence is produced.
+The screenshot set was produced with local capture tooling that is deliberately
+**not committed** — it is throwaway automation, not part of the deliverable.
+Regeneration is a local-only workflow: bring the stack up (Docker Compose for the
+application shots, the `kind` cluster for Kubernetes and monitoring), then capture
+each screen.
 
 ---
 
@@ -278,6 +278,5 @@ PNG, which is how the pytest, Docker, Trivy and Terraform evidence is produced.
   because a `BusyDoctors` component had been removed by mistake; React threw
   during render and the root element stayed empty. The browser console confirmed
   it was an application fault rather than a capture problem.
-- `screenshot-grafana.mjs` asserts that panels actually rendered before writing
-  the image, so a broken datasource can never produce a pretty but empty
-  screenshot.
+- The Grafana capture asserts that panels actually rendered before writing the
+  image, so a broken datasource can never produce a pretty but empty screenshot.

@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CACHE="${MONITORING_CACHE_DIR:-/tmp/opencode/monitoring}"
+CACHE="${MONITORING_CACHE_DIR:-/tmp/clinicdesk/monitoring}"
 NS="${MONITORING_NAMESPACE:-monitoring}"
 
 PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-29.36.1}"

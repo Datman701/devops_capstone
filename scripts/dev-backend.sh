@@ -3,7 +3,7 @@
 set -euo pipefail
 
 BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/backend"
-LOG="${LOG:-/tmp/opencode/clinicdesk-api.log}"
+LOG="${LOG:-/tmp/clinicdesk/clinicdesk-api.log}"
 
 cd "$BACKEND_DIR"
 setsid .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 \
