@@ -84,9 +84,10 @@ clinic-desk/
 ├── docs/
 │   ├── screenshots/             Every submission screenshot
 │   └── security.md              Trivy findings and remediations
-├── demo/                        Slide deck (PPTX/PDF) and the demo video
+├── clinic-desk-deck.pptx          Slide deck (PPTX)
+├── clinic-desk-deck.pdf           Slide deck (PDF)
 ├── screenshots.md               Screenshot index — annotated, mapped to the rubric
-└── scripts/                     Dev helpers, smoke tests, screenshot tooling
+└── scripts/                     Dev helpers, smoke tests, deck builder
 ```
 
 ## Running it

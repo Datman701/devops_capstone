@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the ClinicDesk DevOps capstone slide deck (demo/clinic-desk-deck.pptx).
+"""Build the ClinicDesk DevOps capstone slide deck (clinic-desk-deck.pptx)."""
 
 Native shapes + text only (editable), explicit inch coordinates, 16:9.
 """
@@ -17,7 +17,7 @@ from pptx.util import Inches, Pt
 REPO = os.environ.get("REPO", "github.com/Datman701/devops_capstone")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHOTS = os.path.join(ROOT, "docs", "screenshots")
-OUT = os.path.join(ROOT, "demo", "clinic-desk-deck.pptx")
+OUT = os.path.join(ROOT, "clinic-desk-deck.pptx")
 
 W, H = 13.333, 7.5
 ML, MR = 0.6, 0.6
