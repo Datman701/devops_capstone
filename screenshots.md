@@ -254,23 +254,6 @@ and average latency by endpoint.
 
 ---
 
-## Remaining
-
-All graded artifacts are captured: the real `terraform plan` (17), the
-provisioned EKS cluster and its managed worker node group in the AWS Console
-(18 and 19), and `terraform destroy` (20).
-
----
-
-## Regenerating
-
-The screenshot set was produced with local capture tooling that is deliberately
-**not committed** — it is throwaway automation, not part of the deliverable.
-Regeneration is a local-only workflow: bring the stack up (Docker Compose for the
-application shots, the `kind` cluster for Kubernetes and monitoring), then capture
-each screen.
-
----
 
 ## Notes
 
