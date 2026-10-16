@@ -414,7 +414,6 @@ tests cannot leak rows into each other.
 
 ```bash
 node scripts/e2e-ui-smoke.mjs   # books an appointment through the real UI
-node scripts/shot.mjs http://127.0.0.1:5173 /tmp/dashboard.png
 ```
 
 ## Status

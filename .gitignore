@@ -52,6 +52,23 @@ terraform.tfplan
 .idea/
 .DS_Store
 Thumbs.db
+nohup.out
+*.swp
+*.swo
+*~
+.opencode/
+
+# Stray browser captures at the repo root
+/image*.png
+/*.jpg
+
+# Local-only screenshot tooling - kept on this machine, never shipped
+scripts/screenshots.sh
+scripts/screenshots.mjs
+scripts/screenshot-grafana.mjs
+scripts/shot.mjs
+scripts/render-terminal.mjs
 
 # Agent working notes - deliberately never committed
 handoff.md
+VIDEO-SCRIPT.md
