@@ -245,16 +245,3 @@ requests, request rate by endpoint, response status codes, latency percentiles
 and average latency by endpoint.
 
 ---
-
-
-## Notes
-
-- The badge beside every page title is the short commit SHA the frontend image
-  was built from. CI passes it in as a build arg, so it also serves as the live
-  demo's proof of deployment — it's the short SHA CI builds the frontend image from.
-- Screenshot 1 caught a real bug. The dashboard was rendering completely blank
-  because a `BusyDoctors` component had been removed by mistake; React threw
-  during render and the root element stayed empty. The browser console confirmed
-  it was an application fault rather than a capture problem.
-- The Grafana capture asserts that panels actually rendered before writing the
-  image, so a broken datasource can never produce a pretty but empty screenshot.
