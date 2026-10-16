@@ -73,6 +73,20 @@ resource "aws_eks_cluster" "main" {
     endpoint_private_access = true
   }
 
+  # Access entries are an API-level feature and are ignored unless the cluster's
+  # authentication mode includes API. The default for a new cluster is CONFIG_MAP
+  # only, under which CreateAccessEntry fails with InvalidRequestException. This
+  # must be set at creation time (or an in-place update before any access entry
+  # is created).
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+
+    # Exported explicitly. It defaults to true, but leaving it unset makes the
+    # provider read null against a real true and mark the cluster for
+    # replacement on every plan.
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   tags = {
     Name = var.cluster_name
   }
@@ -102,9 +116,11 @@ resource "aws_eks_node_group" "workers" {
     max_unavailable = 1
   }
 
+  # Node labels. Do not use kubernetes.io/, k8s.io/ or eks.amazonaws.com/ here:
+  # those prefixes are reserved and CreateNodegroup rejects the whole request if
+  # any label starts with one.
   labels = {
-    "eks.amazonaws.com/nodegroup" = var.cluster_name
-    "clinicdesk.io/tier"          = "worker"
+    "clinicdesk.io/tier" = "worker"
   }
 
   tags = {

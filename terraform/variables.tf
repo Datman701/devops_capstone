@@ -51,9 +51,14 @@ variable "kubernetes_version" {
 }
 
 variable "node_instance_types" {
-  description = "EC2 instance types for the worker node group."
+  description = <<-EOT
+    EC2 instance types for the worker node group.
+
+    t3.small is a small, free-tier-eligible default that keeps the demo cluster
+    inexpensive. Raise this for a production cluster.
+  EOT
   type        = list(string)
-  default     = ["t3.medium"]
+  default     = ["t3.small"]
 }
 
 variable "node_desired_size" {

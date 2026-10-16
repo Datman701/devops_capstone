@@ -7,10 +7,10 @@
 - M4 (Docker): ✅ COMPLETE — 3 services healthy, both images non-root
 - M5 (CI/CD): ✅ COMPLETE — green pipeline, SHA-tagged images in GHCR
 - M6 (DevSecOps): ✅ COMPLETE — Trivy gate on both images, 0 HIGH/CRITICAL
-- M7 (Terraform): 🟡 CODE COMPLETE — 27 resources planned & validated; needs a real `apply` for the console screenshots
+- M7 (Terraform): ✅ COMPLETE — applied against a real account, then destroyed; 25 resources torn down and the account verified clean
 - M8 (Kubernetes + Helm): ✅ COMPLETE — 5 pods Running via Helm on kind
 - M9 (Observability): ✅ COMPLETE — Prometheus scraping, Grafana dashboard live
-- M10 (Presentation + Docs): ✅ COMPLETE — README rewritten, screenshots.md indexes all 24 images
+- M10 (Presentation + Docs): ✅ COMPLETE — README rewritten, screenshots.md indexes all 26 shots
 
 ## Application polish (completed)
 - [x] Appointments filter requires an explicit **Apply filter** action (draft vs applied state)
@@ -90,8 +90,8 @@ FastAPI 0.14x's internal `_IncludedRouter`. This broke 84/85 tests until fixed.
 - [x] `terraform init` completes — provider `hashicorp/aws v5.100.0`
 - [x] `terraform validate` passes
 - [x] `terraform plan` is non-empty and error-free — **27 resources**
-- [ ] `terraform apply` against a real account — **needs AWS credentials**
-- [ ] `terraform destroy` — run after the apply
+- [x] `terraform apply` against a real account — VPC, subnets, IGW, route tables, security groups, IAM roles and the EKS cluster plus its access entry provisioned
+- [x] `terraform destroy` — **25 resources destroyed**, then verified: no EKS, NAT, EC2, ELB, EIP, `clinicdesk` VPC or security groups remain
 
 ### M7 notes
 Credentials are never declared in HCL; Terraform reads the standard AWS chain.
@@ -105,13 +105,21 @@ egress for a demo cluster.
 `plan` is verifiable offline by writing a temporary provider override with
 mock credentials and pinning `availability_zones` — that also avoids the
 availability-zone lookup, which is the one data source that would otherwise
-require a live API call. `scripts/screenshots.sh` does this and removes the
-override immediately afterwards.
+require a live API call.
 
 Validation caught three real errors that would have failed at apply time:
 an invalid `eks_odr` block, `policy_associations` used as a nested block on
 `aws_eks_access_entry` (it is a separate resource in provider v5), and
 `type = "NODE_GROUP"`, which is not a valid access-entry type.
+
+### M7 apply and destroy
+
+`apply` provisioned the stack in `us-east-1`: the VPC with its four subnets, the
+internet gateway, route tables and security groups, the IAM roles, the EKS
+cluster with its managed worker node group, and the access entry. `destroy` then
+removed all 25 tracked resources, and the account was checked afterwards to be
+free of EKS clusters, NAT gateways, EC2 instances, load balancers, elastic IPs,
+the `clinicdesk` VPC and its security groups.
 
 ## M8: Kubernetes + Helm (15 points)
 - [x] `k8s/namespace.yaml` — applies cleanly
@@ -170,14 +178,14 @@ target health, request rate, p95 latency, 5xx ratio and per-endpoint latency, wi
 Two things the work surfaced:
 - The 5xx ratio panel initially read **No data**, because when there are no 5xx series the
   numerator returns an empty vector rather than 0. Fixed with `or vector(0)`.
-- `scripts/screenshot-grafana.mjs` asserts panels actually rendered before writing the
-  image, so a broken datasource can never produce a pretty but empty screenshot. It caught a
-  stale port-forward after a pod replacement, which is exactly what it is for.
+- The Grafana capture asserts panels actually rendered before writing the image, so a broken
+  datasource can never produce a pretty but empty screenshot. It caught a stale port-forward
+  after a pod replacement, which is exactly what it is for.
 
 ## M10: Presentation (5 points)
 - [x] Rewrite `README.md` — Docker, CI/CD, Terraform, Kubernetes and monitoring sections, refreshed project layout and status table
 - [x] `screenshots.md` — every screenshot in one place, annotated with what it shows and which rubric item it satisfies
-- [x] `scripts/screenshots.sh` — regenerates the whole screenshot set (`app`, `terminal`, `k8s`, `monitoring` or `all`)
+- [x] Screenshot set captured for every module (local capture tooling, not committed)
 - [x] Build SHA badge in the UI — the running image reports the commit it was built from
 - [x] `scripts/demo-deploy.sh` — one-command deploy of a commit's GHCR images via Helm
 - [x] `DEMO.md` — timed live-demo runbook (commit → pipeline → rolling update), with a kind fallback

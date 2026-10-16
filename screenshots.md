@@ -171,6 +171,9 @@ real account and region rather than mock credentials.
 
 `terraform apply` created the EKS cluster `clinicdesk-eks`, shown **Active** on
 Kubernetes **1.36** in `us-east-1`, with its cluster IAM role and OIDC provider.
+The cluster is provisioned inside the Terraform-managed VPC (two availability
+zones, public subnets and an internet gateway), so the network the rubric asks
+for is the VPC this cluster runs in.
 
 ### 19. The managed worker node group
 
