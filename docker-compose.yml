@@ -52,6 +52,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Shown as a badge in the UI so a running container is traceable to a
+        # commit. CI overrides this with the git SHA.
+        GIT_SHA: ${GIT_SHA:-local}
     image: clinicdesk-frontend:local
     container_name: clinicdesk-frontend
     restart: unless-stopped

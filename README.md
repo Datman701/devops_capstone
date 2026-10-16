@@ -9,6 +9,8 @@ containers, a gated CI/CD pipeline with container scanning, AWS infrastructure
 code, a Helm chart for Kubernetes, and Prometheus/Grafana monitoring.
 
 **Evidence for every module is collected in [`screenshots.md`](screenshots.md).**
+The end-to-end walkthrough — commit, pipeline, deployment — is in
+[`DEMO.md`](DEMO.md).
 
 ## Tech stack
 
@@ -83,6 +85,7 @@ clinic-desk/
 │   ├── screenshots/             Every submission screenshot
 │   └── security.md              Trivy findings and remediations
 ├── screenshots.md               Screenshot index — annotated, mapped to the rubric
+├── DEMO.md                      Live-demo runbook (commit → pipeline → deploy)
 ├── scripts/                     Dev helpers, smoke tests, screenshot tooling
 └── plan.md                      Module checklist with completion evidence
 ```

@@ -177,6 +177,8 @@ jobs:
           context: ./frontend
           push: false
           load: true
+          build-args: |
+            GIT_SHA=${{ steps.meta.outputs.short_sha }}
           tags: |
             clinicdesk-frontend:${{ steps.meta.outputs.short_sha }}
             clinicdesk-frontend:ci
@@ -226,6 +228,8 @@ jobs:
         with:
           context: ./frontend
           push: true
+          build-args: |
+            GIT_SHA=${{ steps.meta.outputs.short_sha }}
           tags: |
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.namespace }}/frontend:${{ steps.meta.outputs.full_sha }}
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.namespace }}/frontend:${{ steps.meta.outputs.short_sha }}

@@ -19,6 +19,11 @@ RUN npm ci
 COPY index.html vite.config.js ./
 COPY src ./src
 
+# Baked into the bundle so the running UI reports the exact commit it was built
+# from. CI passes the git SHA here; the default keeps local builds honest.
+ARG GIT_SHA=dev
+ENV VITE_GIT_SHA=$GIT_SHA
+
 RUN npm run build
 
 # ---------- Stage 2: nginx runtime ----------

@@ -11,7 +11,12 @@ export default function Topbar({ title, subtitle, actions, onToggleSidebar }) {
           ☰
         </button>
         <div>
-          <h1 className="topbar__title">{title}</h1>
+          <h1 className="topbar__title">
+            {title}
+            <span className="topbar__version" title="Commit this build was made from">
+              {import.meta.env.VITE_GIT_SHA || 'dev'}
+            </span>
+          </h1>
           <p className="topbar__subtitle">{subtitle}</p>
         </div>
       </div>
