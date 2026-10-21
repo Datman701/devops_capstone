@@ -9,7 +9,7 @@ containers, a gated CI/CD pipeline with container scanning, AWS infrastructure
 code, a Helm chart for Kubernetes, and Prometheus/Grafana monitoring.
 
 **Evidence for every module is collected in [`screenshots.md`](screenshots.md).**
-The M10 live-demo walkthrough is scripted shot by shot in [`VIDEO.md`](VIDEO.md).
+video link - https://drive.google.com/file/d/1WLRwV8kQ5vtzMEcvhukj83YHCRpcAIgH/view?usp=sharing
 
 ## Tech stack
 
