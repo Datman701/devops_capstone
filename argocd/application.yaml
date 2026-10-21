@@ -26,11 +26,11 @@ spec:
         - name: images.backend.repository
           value: ghcr.io/datman701/devops_capstone/backend
         - name: images.backend.tag
-          value: "29d8734"
+          value: "867b23a"
         - name: images.frontend.repository
           value: ghcr.io/datman701/devops_capstone/frontend
         - name: images.frontend.tag
-          value: "29d8734"
+          value: "867b23a"
   destination:
     server: https://kubernetes.default.svc
     namespace: clinicdesk
