@@ -10,7 +10,7 @@ import PatientsPage from './pages/PatientsPage';
 import { useReferenceData } from './hooks/useClinicData';
 
 const TITLES = {
-  '/': { title: 'Dashboard', subtitle: 'Clinic-wide appointment overview' },
+  '/': { title: 'Dashboard', subtitle: 'Appointments deployed by the pipeline' },
   '/appointments': {
     title: 'Appointments',
     subtitle: 'Search, reschedule and cancel bookings',
